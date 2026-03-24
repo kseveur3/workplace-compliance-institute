@@ -79,8 +79,36 @@ function DashboardPage() {
     <div style={{ padding: '2rem' }}>
       <h1>Dashboard</h1>
       <p>{user?.primaryEmailAddress?.emailAddress}</p>
-      <SignOutButton />
+      <div style={{ marginTop: '1rem', display: 'flex', gap: '1rem' }}>
+        <Link to="/course">Start Course</Link>
+        <SignOutButton />
+      </div>
     </div>
+  )
+}
+
+function CoursePage() {
+  return (
+    <div style={{ padding: '2rem' }}>
+      <h1>EEO Investigator Certification</h1>
+      <p>Course content coming soon.</p>
+      <Link to="/dashboard" style={{ marginTop: '1rem', display: 'inline-block' }}>
+        Back to Dashboard
+      </Link>
+    </div>
+  )
+}
+
+function ProtectedCourse() {
+  return (
+    <>
+      <SignedIn>
+        <CoursePage />
+      </SignedIn>
+      <SignedOut>
+        <Navigate to="/sign-in" replace />
+      </SignedOut>
+    </>
   )
 }
 
@@ -110,6 +138,7 @@ export default function App() {
         element={<SignUp routing="path" path="/sign-up" />}
       />
       <Route path="/dashboard" element={<ProtectedDashboard />} />
+      <Route path="/course" element={<ProtectedCourse />} />
     </Routes>
   )
 }
