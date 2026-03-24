@@ -86,6 +86,48 @@ const QUIZZES: SectionQuiz[] = [
   },
 ]
 
+const FINAL_EXAM_QUESTIONS: QuizQuestion[] = [
+  {
+    id: 'fe-1',
+    question: 'Which federal agency is the primary enforcement body for EEO laws in the United States?',
+    options: [
+      'Department of Labor',
+      'Office of Personnel Management',
+      'Equal Employment Opportunity Commission (EEOC)',
+      'Department of Justice',
+    ],
+    correctIndex: 2,
+  },
+  {
+    id: 'fe-2',
+    question: 'Title VII of the Civil Rights Act of 1964 prohibits discrimination based on all of the following EXCEPT:',
+    options: ['Race', 'National origin', 'Political affiliation', 'Religion'],
+    correctIndex: 2,
+  },
+  {
+    id: 'fe-3',
+    question: 'In a disparate treatment claim, the burden-shifting framework was established in:',
+    options: [
+      'Harris v. Forklift Systems',
+      'McDonnell Douglas Corp. v. Green',
+      'Meritor Savings Bank v. Vinson',
+      'Burlington Industries v. Ellerth',
+    ],
+    correctIndex: 1,
+  },
+  {
+    id: 'fe-4',
+    question: 'A hostile work environment claim requires that the conduct be:',
+    options: [
+      'Physical and intentional',
+      'Reported to a supervisor before filing',
+      'Both subjectively and objectively offensive',
+      'Committed only by a supervisor',
+    ],
+    correctIndex: 2,
+  },
+]
+
 const COURSE: Course = {
   id: 'eeo-investigator',
   title: 'EEO Investigator Certification',
@@ -162,6 +204,8 @@ interface CompletionContextValue {
   toggle: (id: string) => void
   quizResults: Record<string, QuizResult>
   setQuizResult: (sectionId: string, result: QuizResult) => void
+  finalExamResult: QuizResult | null
+  setFinalExamResult: (result: QuizResult) => void
 }
 
 const CompletionContext = createContext<CompletionContextValue>({
@@ -169,6 +213,8 @@ const CompletionContext = createContext<CompletionContextValue>({
   toggle: () => {},
   quizResults: {},
   setQuizResult: () => {},
+  finalExamResult: null,
+  setFinalExamResult: () => {},
 })
 
 function useCompletion() {
@@ -264,8 +310,7 @@ function DashboardPage() {
 const TOTAL_LESSONS = COURSE.sections.reduce((sum, s) => sum + s.lessons.length, 0)
 
 function CoursePage() {
-  const { completed, quizResults } = useCompletion()
-  const [certified, setCertified] = useState(false)
+  const { completed, quizResults, finalExamResult } = useCompletion()
   const location = useLocation()
   const quizSummary = (location.state as { quizSummary?: { correct: number; total: number; passed: boolean; sectionTitle: string } } | null)?.quizSummary
 
@@ -278,6 +323,22 @@ function CoursePage() {
       <Link to="/dashboard">← Back to Dashboard</Link>
       <h1 style={{ fontSize: '1.75rem', margin: '0.75rem 0 0.5rem' }}>{COURSE.title}</h1>
       <p style={{ marginBottom: '0.75rem' }}>Progress: {completed.size} of {TOTAL_LESSONS} lessons completed</p>
+
+      <div style={{ marginBottom: '1.5rem', padding: '0.75rem 1rem', border: '1px solid var(--border)', borderRadius: '4px' }}>
+        <p style={{ fontWeight: 600, margin: '0 0 0.5rem' }}>Certification Requirements</p>
+        <ul style={{ margin: 0, paddingLeft: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+          <li style={{ color: allLessonsDone ? 'green' : 'inherit' }}>
+            All lessons completed: {allLessonsDone ? '✓ Yes' : 'No'}
+          </li>
+          <li style={{ color: allQuizzesPassed ? 'green' : 'inherit' }}>
+            All section quizzes passed: {allQuizzesPassed ? '✓ Yes' : 'No'}
+          </li>
+          <li style={{ color: finalExamResult === 'passed' ? 'green' : finalExamResult === 'failed' ? 'red' : 'inherit' }}>
+            Final exam:{' '}
+            {finalExamResult === 'passed' ? '✓ Passed' : finalExamResult === 'failed' ? '✗ Failed' : 'Not started'}
+          </li>
+        </ul>
+      </div>
 
       {quizSummary && (
         <div style={{ marginBottom: '1rem', padding: '0.75rem 1rem', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '0.9rem' }}>
@@ -293,12 +354,10 @@ function CoursePage() {
         <span style={{ fontWeight: 600, color: eligible ? 'green' : '#666' }}>
           {eligible ? '✓ Certification Unlocked' : '⊘ Certification Locked'}
         </span>
-        {certified ? (
-          <span style={{ color: 'green', fontSize: '0.9rem' }}>Certification awarded (placeholder)</span>
+        {eligible ? (
+          <Link to="/final-exam">Take Final Exam</Link>
         ) : (
-          <button disabled={!eligible} onClick={() => setCertified(true)}>
-            Get Certified
-          </button>
+          <button disabled>Take Final Exam</button>
         )}
       </div>
       {COURSE.sections.map((section) => {
@@ -491,6 +550,108 @@ function ProtectedQuiz() {
   )
 }
 
+function FinalExamPage() {
+  const { completed, quizResults, setFinalExamResult } = useCompletion()
+  const allLessonsDone = ALL_LESSONS.every((l) => completed.has(l.id))
+  const allQuizzesPassed = COURSE.sections.every((s) => quizResults[s.id] === 'passed')
+  const eligible = allLessonsDone && allQuizzesPassed
+
+  const [currentIndex, setCurrentIndex] = useState(0)
+  const [answers, setAnswers] = useState<(number | null)[]>(Array(FINAL_EXAM_QUESTIONS.length).fill(null))
+  const [showResults, setShowResults] = useState(false)
+
+  if (!eligible) {
+    return (
+      <div style={{ padding: '2rem' }}>
+        <p>You must complete all lessons and pass all section quizzes before taking the final exam.</p>
+        <Link to="/course">← Back to Course</Link>
+      </div>
+    )
+  }
+
+  if (showResults) {
+    const correct = answers.filter((a, i) => a === FINAL_EXAM_QUESTIONS[i].correctIndex).length
+    const total = FINAL_EXAM_QUESTIONS.length
+    const passed = correct / total >= 0.8
+    return (
+      <div style={{ padding: '2rem', maxWidth: '640px' }}>
+        <h1 style={{ fontSize: '1.75rem', margin: '0 0 0.5rem' }}>Final Exam Results</h1>
+        <p style={{ marginBottom: '0.5rem' }}>You scored {correct} out of {total}.</p>
+        <p style={{ fontWeight: 600, color: passed ? 'green' : 'red' }}>
+          {passed ? 'Final exam passed.' : 'Final exam failed.'}
+        </p>
+        <div style={{ marginTop: '1.5rem', display: 'flex', gap: '1rem' }}>
+          {!passed && (
+            <button onClick={() => {
+              setAnswers(Array(FINAL_EXAM_QUESTIONS.length).fill(null))
+              setCurrentIndex(0)
+              setShowResults(false)
+            }}>
+              Retry Exam
+            </button>
+          )}
+          <Link to="/course">Back to Course</Link>
+        </div>
+      </div>
+    )
+  }
+
+  const question = FINAL_EXAM_QUESTIONS[currentIndex]
+  const selected = answers[currentIndex]
+  const isLast = currentIndex === FINAL_EXAM_QUESTIONS.length - 1
+
+  return (
+    <div style={{ padding: '2rem', maxWidth: '640px' }}>
+      <Link to="/course">← Back to Course</Link>
+      <h1 style={{ fontSize: '1.75rem', margin: '0.75rem 0 1rem' }}>Final Exam</h1>
+      <p style={{ marginBottom: '1rem', fontSize: '0.9rem', color: '#666' }}>
+        Question {currentIndex + 1} of {FINAL_EXAM_QUESTIONS.length}
+      </p>
+      <p style={{ fontWeight: 600, marginBottom: '1rem' }}>{question.question}</p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1.5rem' }}>
+        {question.options.map((option, i) => (
+          <label key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+            <input
+              type="radio"
+              name={`fe-${question.id}`}
+              checked={selected === i}
+              onChange={() => setAnswers((prev) => { const next = [...prev]; next[currentIndex] = i; return next })}
+            />
+            {option}
+          </label>
+        ))}
+      </div>
+      <button
+        disabled={selected === null}
+        onClick={() => {
+          if (isLast) {
+            const correct = answers.filter((a, i) => a === FINAL_EXAM_QUESTIONS[i].correctIndex).length
+            setFinalExamResult(correct / FINAL_EXAM_QUESTIONS.length >= 0.8 ? 'passed' : 'failed')
+            setShowResults(true)
+          } else {
+            setCurrentIndex((i) => i + 1)
+          }
+        }}
+      >
+        {isLast ? 'Submit Exam' : 'Next Question'}
+      </button>
+    </div>
+  )
+}
+
+function ProtectedFinalExam() {
+  return (
+    <>
+      <SignedIn>
+        <FinalExamPage />
+      </SignedIn>
+      <SignedOut>
+        <Navigate to="/sign-in" replace />
+      </SignedOut>
+    </>
+  )
+}
+
 function ProtectedCourse() {
   return (
     <>
@@ -529,8 +690,10 @@ export default function App() {
   const setQuizResult = (sectionId: string, result: QuizResult) =>
     setQuizResults((prev) => ({ ...prev, [sectionId]: result }))
 
+  const [finalExamResult, setFinalExamResult] = useState<QuizResult | null>(null)
+
   return (
-    <CompletionContext.Provider value={{ completed, toggle, quizResults, setQuizResult }}>
+    <CompletionContext.Provider value={{ completed, toggle, quizResults, setQuizResult, finalExamResult, setFinalExamResult }}>
     <Routes>
       <Route path="/" element={<HomePage />} />
       <Route
@@ -545,6 +708,7 @@ export default function App() {
       <Route path="/course" element={<ProtectedCourse />} />
       <Route path="/lesson/:id" element={<ProtectedLesson />} />
       <Route path="/quiz/:sectionId" element={<ProtectedQuiz />} />
+      <Route path="/final-exam" element={<ProtectedFinalExam />} />
     </Routes>
     </CompletionContext.Provider>
   )
