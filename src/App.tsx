@@ -1,5 +1,5 @@
 import { Routes, Route, Link, Navigate } from 'react-router-dom'
-import { SignIn, SignUp, SignedIn, SignedOut } from '@clerk/clerk-react'
+import { SignIn, SignUp, SignedIn, SignedOut, SignOutButton, useUser } from '@clerk/clerk-react'
 
 function HomePage() {
   return (
@@ -73,10 +73,13 @@ function HomePage() {
 }
 
 function DashboardPage() {
+  const { user } = useUser()
+
   return (
     <div style={{ padding: '2rem' }}>
       <h1>Dashboard</h1>
-      <p>Welcome! You are signed in.</p>
+      <p>{user?.primaryEmailAddress?.emailAddress}</p>
+      <SignOutButton />
     </div>
   )
 }
