@@ -287,6 +287,10 @@ function HomePage() {
             Go to Dashboard
           </Link>
         </SignedIn>
+
+        <p style={{ marginTop: '2.5rem', fontSize: '0.85rem', color: '#666' }}>
+          <Link to="/verify" style={{ color: '#666' }}>Verify a Certificate</Link>
+        </p>
       </main>
     </div>
   )
@@ -558,6 +562,7 @@ function ProtectedQuiz() {
 
 function FinalExamPage() {
   const { completed, quizResults, setFinalExamResult } = useCompletion()
+  const { user } = useUser()
   const allLessonsDone = ALL_LESSONS.every((l) => completed.has(l.id))
   const allQuizzesPassed = COURSE.sections.every((s) => quizResults[s.id] === 'passed')
   const eligible = allLessonsDone && allQuizzesPassed
@@ -632,7 +637,21 @@ function FinalExamPage() {
         onClick={() => {
           if (isLast) {
             const correct = answers.filter((a, i) => a === FINAL_EXAM_QUESTIONS[i].correctIndex).length
-            setFinalExamResult(correct / FINAL_EXAM_QUESTIONS.length >= 0.8 ? 'passed' : 'failed')
+            const passed = correct / FINAL_EXAM_QUESTIONS.length >= 0.8
+            setFinalExamResult(passed ? 'passed' : 'failed')
+            if (passed) {
+              const email = user?.primaryEmailAddress?.emailAddress
+              if (email) {
+                const records: { email: string; courseName: string; completionDate: string }[] =
+                  JSON.parse(localStorage.getItem('wci_certifications') || '[]')
+                const date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+                const idx = records.findIndex((r) => r.email === email)
+                const record = { email, courseName: COURSE.title, completionDate: date }
+                if (idx >= 0) records[idx] = record
+                else records.push(record)
+                localStorage.setItem('wci_certifications', JSON.stringify(records))
+              }
+            }
             setShowResults(true)
           } else {
             setCurrentIndex((i) => i + 1)
@@ -672,6 +691,56 @@ function CertificatePage() {
       </div>
 
       <Link to="/course">← Back to Course</Link>
+    </div>
+  )
+}
+
+function VerifyPage() {
+  const [email, setEmail] = useState('')
+  const [result, setResult] = useState<{ email: string; courseName: string; completionDate: string } | 'not-found' | null>(null)
+
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    const records: { email: string; courseName: string; completionDate: string }[] =
+      JSON.parse(localStorage.getItem('wci_certifications') || '[]')
+    const found = records.find((r) => r.email.toLowerCase() === email.toLowerCase())
+    setResult(found ?? 'not-found')
+  }
+
+  return (
+    <div style={{ padding: '3rem 2rem', maxWidth: '500px', margin: '0 auto' }}>
+      <Link to="/">← Back to Home</Link>
+      <h1 style={{ fontSize: '1.75rem', margin: '1rem 0 0.5rem' }}>Verify Certificate</h1>
+      <p style={{ color: '#666', marginBottom: '1.5rem' }}>Enter an email address to check certification status.</p>
+
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1.5rem' }}>
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="Email address"
+          required
+          style={{ padding: '0.5rem 0.75rem', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '1rem', background: 'var(--bg)', color: 'var(--text-h)' }}
+        />
+        <button type="submit" style={{ padding: '0.5rem 1rem', alignSelf: 'flex-start' }}>
+          Check Status
+        </button>
+      </form>
+
+      {result === 'not-found' && (
+        <div style={{ padding: '1rem', border: '1px solid var(--border)', borderRadius: '4px' }}>
+          <p style={{ margin: 0, color: 'red' }}>No certification found for this email.</p>
+        </div>
+      )}
+
+      {result && result !== 'not-found' && (
+        <div style={{ padding: '1rem', border: '1px solid var(--border)', borderRadius: '4px', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+          <p style={{ margin: 0, fontWeight: 600, color: 'green' }}>✓ Verified</p>
+          <p style={{ margin: 0 }}>Course: {result.courseName}</p>
+          <p style={{ margin: 0 }}>Status: Certified</p>
+          <p style={{ margin: 0 }}>Completion date: {result.completionDate}</p>
+        </div>
+      )}
     </div>
   )
 }
@@ -760,6 +829,7 @@ export default function App() {
       <Route path="/quiz/:sectionId" element={<ProtectedQuiz />} />
       <Route path="/final-exam" element={<ProtectedFinalExam />} />
       <Route path="/certificate" element={<ProtectedCertificate />} />
+      <Route path="/verify" element={<VerifyPage />} />
     </Routes>
     </CompletionContext.Provider>
   )
