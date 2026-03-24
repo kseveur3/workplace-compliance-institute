@@ -3,12 +3,71 @@ import { SignIn, SignUp, SignedIn, SignedOut } from '@clerk/clerk-react'
 
 function HomePage() {
   return (
-    <div style={{ padding: '2rem' }}>
-      <h1>Workplace Compliance Institute</h1>
-      <nav style={{ marginTop: '1rem', display: 'flex', gap: '1rem' }}>
-        <Link to="/sign-in">Sign In</Link>
-        <Link to="/sign-up">Sign Up</Link>
-      </nav>
+    <div style={{ maxWidth: '640px', margin: '0 auto', padding: '4rem 2rem', textAlign: 'center' }}>
+      <header style={{ marginBottom: '3rem' }}>
+        <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700 }}>
+          Workplace Compliance Institute
+        </h1>
+        <p style={{ margin: '0.25rem 0 0', color: '#555', fontSize: '0.95rem' }}>
+          Professional Certification &amp; Training
+        </p>
+      </header>
+
+      <main>
+        <h2 style={{ fontSize: '2rem', margin: '0 0 1rem' }}>
+          EEO Investigator Certification
+        </h2>
+        <p style={{ color: '#444', lineHeight: '1.6', margin: '0 0 2rem' }}>
+          Complete a 40-hour, self-paced training program and earn a verifiable certification.
+        </p>
+
+        <SignedOut>
+          <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+            <Link
+              to="/sign-up"
+              style={{
+                padding: '0.6rem 1.4rem',
+                background: 'var(--text-h)',
+                color: 'var(--bg)',
+                borderRadius: '4px',
+                textDecoration: 'none',
+                fontWeight: 600,
+              }}
+            >
+              Start Certification
+            </Link>
+            <Link
+              to="/sign-in"
+              style={{
+                padding: '0.6rem 1.4rem',
+                border: '1px solid var(--text-h)',
+                borderRadius: '4px',
+                textDecoration: 'none',
+                fontWeight: 600,
+                color: 'var(--text-h)',
+              }}
+            >
+              Log In
+            </Link>
+          </div>
+        </SignedOut>
+
+        <SignedIn>
+          <Link
+            to="/dashboard"
+            style={{
+              padding: '0.6rem 1.4rem',
+              background: 'var(--text-h)',
+              color: 'var(--bg)',
+              borderRadius: '4px',
+              textDecoration: 'none',
+              fontWeight: 600,
+            }}
+          >
+            Go to Dashboard
+          </Link>
+        </SignedIn>
+      </main>
     </div>
   )
 }
