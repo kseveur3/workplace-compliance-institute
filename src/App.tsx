@@ -1,3 +1,4 @@
+import { useState, createContext, useContext } from 'react'
 import { Routes, Route, Link, Navigate, useParams } from 'react-router-dom'
 import { SignIn, SignUp, SignedIn, SignedOut, SignOutButton, useUser } from '@clerk/clerk-react'
 
@@ -86,6 +87,22 @@ const COURSE: Course = {
       ],
     },
   ],
+}
+
+const ALL_LESSONS = COURSE.sections.flatMap((s) => s.lessons)
+
+interface CompletionContextValue {
+  completed: Set<string>
+  toggle: (id: string) => void
+}
+
+const CompletionContext = createContext<CompletionContextValue>({
+  completed: new Set(),
+  toggle: () => {},
+})
+
+function useCompletion() {
+  return useContext(CompletionContext)
 }
 
 function HomePage() {
@@ -177,18 +194,19 @@ function DashboardPage() {
 const TOTAL_LESSONS = COURSE.sections.reduce((sum, s) => sum + s.lessons.length, 0)
 
 function CoursePage() {
+  const { completed } = useCompletion()
   return (
     <div style={{ padding: '2rem', maxWidth: '640px' }}>
       <Link to="/dashboard">← Back to Dashboard</Link>
       <h1 style={{ fontSize: '1.75rem', margin: '0.75rem 0 0.5rem' }}>{COURSE.title}</h1>
-      <p style={{ marginBottom: '1.5rem' }}>Progress: 0 of {TOTAL_LESSONS} lessons completed</p>
+      <p style={{ marginBottom: '1.5rem' }}>Progress: {completed.size} of {TOTAL_LESSONS} lessons completed</p>
       {COURSE.sections.map((section) => (
         <div key={section.id} style={{ marginBottom: '2rem' }}>
           <h2 style={{ marginBottom: '0.5rem' }}>{section.title}</h2>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', paddingLeft: '0.5rem' }}>
             {section.lessons.map((lesson) => (
               <Link key={lesson.id} to={`/lesson/${lesson.id}`}>
-                {lesson.title}
+                {completed.has(lesson.id) ? '✓ ' : ''}{lesson.title}
               </Link>
             ))}
           </div>
@@ -200,12 +218,13 @@ function CoursePage() {
 
 function LessonPage() {
   const { id } = useParams<{ id: string }>()
+  const { completed, toggle } = useCompletion()
 
-  let foundLesson: { course: typeof COURSE; section: (typeof COURSE.sections)[0]; lesson: (typeof COURSE.sections)[0]['lessons'][0] } | null = null
+  let foundLesson: { section: (typeof COURSE.sections)[0]; lesson: (typeof COURSE.sections)[0]['lessons'][0] } | null = null
   for (const section of COURSE.sections) {
     const lesson = section.lessons.find((l) => l.id === id)
     if (lesson) {
-      foundLesson = { course: COURSE, section, lesson }
+      foundLesson = { section, lesson }
       break
     }
   }
@@ -220,6 +239,10 @@ function LessonPage() {
   }
 
   const { section, lesson } = foundLesson
+  const lessonIndex = ALL_LESSONS.findIndex((l) => l.id === id)
+  const prevLesson = lessonIndex > 0 ? ALL_LESSONS[lessonIndex - 1] : null
+  const nextLesson = lessonIndex < ALL_LESSONS.length - 1 ? ALL_LESSONS[lessonIndex + 1] : null
+  const isDone = completed.has(lesson.id)
 
   return (
     <div style={{ padding: '2rem', maxWidth: '640px' }}>
@@ -244,8 +267,21 @@ function LessonPage() {
         {lesson.narrationPlaceholder}
       </div>
 
+      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2rem' }}>
+        <button onClick={() => toggle(lesson.id)}>
+          {isDone ? 'Mark as Incomplete' : 'Mark as Complete'}
+        </button>
+        <span style={{ color: isDone ? 'green' : '#666', fontSize: '0.9rem' }}>
+          {isDone ? '✓ Completed' : 'Not completed'}
+        </span>
+      </div>
+
       <div style={{ display: 'flex', gap: '1rem' }}>
-        <Link to="/course">← Back to Course</Link>
+        {prevLesson && <Link to={`/lesson/${prevLesson.id}`}>← Previous Lesson</Link>}
+        {nextLesson && <Link to={`/lesson/${nextLesson.id}`}>Next Lesson →</Link>}
+      </div>
+      <div style={{ marginTop: '0.75rem', display: 'flex', gap: '1rem' }}>
+        <Link to="/course">Back to Course</Link>
         <Link to="/dashboard">Back to Dashboard</Link>
       </div>
     </div>
@@ -292,7 +328,15 @@ function ProtectedDashboard() {
 }
 
 export default function App() {
+  const [completed, setCompleted] = useState<Set<string>>(new Set())
+  const toggle = (id: string) => setCompleted((prev) => {
+    const next = new Set(prev)
+    next.has(id) ? next.delete(id) : next.add(id)
+    return next
+  })
+
   return (
+    <CompletionContext.Provider value={{ completed, toggle }}>
     <Routes>
       <Route path="/" element={<HomePage />} />
       <Route
@@ -307,5 +351,6 @@ export default function App() {
       <Route path="/course" element={<ProtectedCourse />} />
       <Route path="/lesson/:id" element={<ProtectedLesson />} />
     </Routes>
+    </CompletionContext.Provider>
   )
 }
