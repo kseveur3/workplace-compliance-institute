@@ -1,5 +1,5 @@
 import { useState, createContext, useContext } from 'react'
-import { Routes, Route, Link, Navigate, useParams } from 'react-router-dom'
+import { Routes, Route, Link, Navigate, useParams, useNavigate, useLocation } from 'react-router-dom'
 import { SignIn, SignUp, SignedIn, SignedOut, SignOutButton, useUser } from '@clerk/clerk-react'
 
 interface Lesson {
@@ -265,11 +265,42 @@ const TOTAL_LESSONS = COURSE.sections.reduce((sum, s) => sum + s.lessons.length,
 
 function CoursePage() {
   const { completed, quizResults } = useCompletion()
+  const [certified, setCertified] = useState(false)
+  const location = useLocation()
+  const quizSummary = (location.state as { quizSummary?: { correct: number; total: number; passed: boolean; sectionTitle: string } } | null)?.quizSummary
+
+  const allLessonsDone = ALL_LESSONS.every((l) => completed.has(l.id))
+  const allQuizzesPassed = COURSE.sections.every((s) => quizResults[s.id] === 'passed')
+  const eligible = allLessonsDone && allQuizzesPassed
+
   return (
     <div style={{ padding: '2rem', maxWidth: '640px' }}>
       <Link to="/dashboard">← Back to Dashboard</Link>
       <h1 style={{ fontSize: '1.75rem', margin: '0.75rem 0 0.5rem' }}>{COURSE.title}</h1>
-      <p style={{ marginBottom: '1.5rem' }}>Progress: {completed.size} of {TOTAL_LESSONS} lessons completed</p>
+      <p style={{ marginBottom: '0.75rem' }}>Progress: {completed.size} of {TOTAL_LESSONS} lessons completed</p>
+
+      {quizSummary && (
+        <div style={{ marginBottom: '1rem', padding: '0.75rem 1rem', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '0.9rem' }}>
+          <strong>{quizSummary.sectionTitle}:</strong>{' '}
+          You scored {quizSummary.correct} out of {quizSummary.total}.{' '}
+          <span style={{ color: quizSummary.passed ? 'green' : 'red', fontWeight: 600 }}>
+            {quizSummary.passed ? 'Section passed.' : 'You must review the section before retrying.'}
+          </span>
+        </div>
+      )}
+
+      <div style={{ marginBottom: '1.5rem', padding: '0.75rem 1rem', border: '1px solid var(--border)', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+        <span style={{ fontWeight: 600, color: eligible ? 'green' : '#666' }}>
+          {eligible ? '✓ Certification Unlocked' : '⊘ Certification Locked'}
+        </span>
+        {certified ? (
+          <span style={{ color: 'green', fontSize: '0.9rem' }}>Certification awarded (placeholder)</span>
+        ) : (
+          <button disabled={!eligible} onClick={() => setCertified(true)}>
+            Get Certified
+          </button>
+        )}
+      </div>
       {COURSE.sections.map((section) => {
         const quizResult = quizResults[section.id]
         const quizLabel = quizResult === 'passed' ? '✓ Passed' : quizResult === 'failed' ? '✗ Failed' : 'Not started'
@@ -384,49 +415,19 @@ function ProtectedLesson() {
 function QuizPage() {
   const { sectionId } = useParams<{ sectionId: string }>()
   const { setQuizResult } = useCompletion()
+  const navigate = useNavigate()
 
   const quiz = QUIZZES.find((q) => q.sectionId === sectionId)
   const section = COURSE.sections.find((s) => s.id === sectionId)
 
   const [currentIndex, setCurrentIndex] = useState(0)
   const [answers, setAnswers] = useState<(number | null)[]>(() => quiz ? Array(quiz.questions.length).fill(null) : [])
-  const [showResults, setShowResults] = useState(false)
 
   if (!quiz || !section) {
     return (
       <div style={{ padding: '2rem' }}>
         <p>Quiz not found.</p>
         <Link to="/course">← Back to Course</Link>
-      </div>
-    )
-  }
-
-  if (showResults) {
-    const correct = answers.filter((a, i) => a === quiz.questions[i].correctIndex).length
-    const total = quiz.questions.length
-    const passed = correct / total >= 0.8
-    return (
-      <div style={{ padding: '2rem', maxWidth: '640px' }}>
-        <Link to="/course">← Back to Course</Link>
-        <h1 style={{ fontSize: '1.75rem', margin: '0.75rem 0 0.5rem' }}>Quiz Results</h1>
-        <p style={{ marginBottom: '0.5rem' }}>You scored {correct} out of {total}.</p>
-        {passed ? (
-          <p style={{ color: 'green', fontWeight: 600 }}>Section passed.</p>
-        ) : (
-          <p style={{ color: 'red', fontWeight: 600 }}>You must review the section before retrying.</p>
-        )}
-        <div style={{ marginTop: '1.5rem', display: 'flex', gap: '1rem' }}>
-          {!passed && (
-            <button onClick={() => {
-              setAnswers(Array(quiz.questions.length).fill(null))
-              setCurrentIndex(0)
-              setShowResults(false)
-            }}>
-              Retry Quiz
-            </button>
-          )}
-          <Link to="/course">Back to Course</Link>
-        </div>
       </div>
     )
   }
@@ -462,8 +463,10 @@ function QuizPage() {
         onClick={() => {
           if (isLast) {
             const correct = answers.filter((a, i) => a === quiz.questions[i].correctIndex).length
-            setQuizResult(section.id, correct / quiz.questions.length >= 0.8 ? 'passed' : 'failed')
-            setShowResults(true)
+            const total = quiz.questions.length
+            const passed = correct / total >= 0.8
+            setQuizResult(section.id, passed ? 'passed' : 'failed')
+            navigate('/course', { state: { quizSummary: { correct, total, passed, sectionTitle: section.title } } })
           } else {
             setCurrentIndex((i) => i + 1)
           }
