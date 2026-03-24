@@ -360,6 +360,12 @@ function CoursePage() {
           <button disabled>Take Final Exam</button>
         )}
       </div>
+      {finalExamResult === 'passed' && (
+        <div style={{ marginBottom: '1.5rem' }}>
+          <Link to="/certificate">View Certificate →</Link>
+        </div>
+      )}
+
       {COURSE.sections.map((section) => {
         const quizResult = quizResults[section.id]
         const quizLabel = quizResult === 'passed' ? '✓ Passed' : quizResult === 'failed' ? '✗ Failed' : 'Not started'
@@ -639,6 +645,50 @@ function FinalExamPage() {
   )
 }
 
+function CertificatePage() {
+  const { finalExamResult } = useCompletion()
+  const { user } = useUser()
+
+  if (finalExamResult !== 'passed') {
+    return <Navigate to="/course" replace />
+  }
+
+  const email = user?.primaryEmailAddress?.emailAddress ?? 'the participant'
+  const date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+
+  return (
+    <div style={{ padding: '3rem 2rem', maxWidth: '600px', margin: '0 auto', textAlign: 'center' }}>
+      <h1 style={{ fontSize: '1.75rem', margin: '0 0 0.5rem' }}>Certificate of Completion</h1>
+      <p style={{ color: '#666', fontSize: '0.9rem', margin: '0 0 2rem' }}>{date}</p>
+
+      <div style={{ border: '1px solid var(--border)', borderRadius: '4px', padding: '2rem', marginBottom: '2rem' }}>
+        <p style={{ margin: '0 0 1rem', lineHeight: '1.7' }}>
+          This certifies that <strong>{email}</strong> has successfully completed the{' '}
+          <strong>EEO Investigator Certification</strong>.
+        </p>
+        <p style={{ margin: 0, color: '#666', fontSize: '0.9rem' }}>
+          Issued by Workplace Compliance Institute
+        </p>
+      </div>
+
+      <Link to="/course">← Back to Course</Link>
+    </div>
+  )
+}
+
+function ProtectedCertificate() {
+  return (
+    <>
+      <SignedIn>
+        <CertificatePage />
+      </SignedIn>
+      <SignedOut>
+        <Navigate to="/sign-in" replace />
+      </SignedOut>
+    </>
+  )
+}
+
 function ProtectedFinalExam() {
   return (
     <>
@@ -709,6 +759,7 @@ export default function App() {
       <Route path="/lesson/:id" element={<ProtectedLesson />} />
       <Route path="/quiz/:sectionId" element={<ProtectedQuiz />} />
       <Route path="/final-exam" element={<ProtectedFinalExam />} />
+      <Route path="/certificate" element={<ProtectedCertificate />} />
     </Routes>
     </CompletionContext.Provider>
   )
