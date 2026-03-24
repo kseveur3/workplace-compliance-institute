@@ -22,6 +22,70 @@ interface Course {
   sections: Section[]
 }
 
+interface QuizQuestion {
+  id: string
+  question: string
+  options: string[]
+  correctIndex: number
+}
+
+interface SectionQuiz {
+  sectionId: string
+  questions: QuizQuestion[]
+}
+
+const QUIZZES: SectionQuiz[] = [
+  {
+    sectionId: 'section-1',
+    questions: [
+      {
+        id: 'q1-1',
+        question: 'Which federal agency is primarily responsible for enforcing EEO laws?',
+        options: [
+          'Department of Labor',
+          'Equal Employment Opportunity Commission (EEOC)',
+          'Department of Justice',
+          'Office of Personnel Management',
+        ],
+        correctIndex: 1,
+      },
+      {
+        id: 'q1-2',
+        question: 'Which of the following is NOT a protected characteristic under Title VII?',
+        options: ['Race', 'Religion', 'Political affiliation', 'National origin'],
+        correctIndex: 2,
+      },
+    ],
+  },
+  {
+    sectionId: 'section-2',
+    questions: [
+      {
+        id: 'q2-1',
+        question: 'Disparate treatment occurs when an employer:',
+        options: [
+          'Applies a neutral policy that disproportionately impacts a protected group',
+          'Treats an employee less favorably because of a protected characteristic',
+          'Fails to provide a reasonable accommodation',
+          'Retaliates against an employee for filing a complaint',
+        ],
+        correctIndex: 1,
+      },
+      {
+        id: 'q2-2',
+        question: 'For a hostile work environment claim, the conduct must be:',
+        options: [
+          'Intentional and physical in nature',
+          'Reported to HR before it legally qualifies',
+          'Both subjectively and objectively offensive',
+          'Committed only by a direct supervisor',
+        ],
+        correctIndex: 2,
+      },
+    ],
+  },
+]
+
 const COURSE: Course = {
   id: 'eeo-investigator',
   title: 'EEO Investigator Certification',
@@ -91,14 +155,20 @@ const COURSE: Course = {
 
 const ALL_LESSONS = COURSE.sections.flatMap((s) => s.lessons)
 
+type QuizResult = 'passed' | 'failed'
+
 interface CompletionContextValue {
   completed: Set<string>
   toggle: (id: string) => void
+  quizResults: Record<string, QuizResult>
+  setQuizResult: (sectionId: string, result: QuizResult) => void
 }
 
 const CompletionContext = createContext<CompletionContextValue>({
   completed: new Set(),
   toggle: () => {},
+  quizResults: {},
+  setQuizResult: () => {},
 })
 
 function useCompletion() {
@@ -194,24 +264,34 @@ function DashboardPage() {
 const TOTAL_LESSONS = COURSE.sections.reduce((sum, s) => sum + s.lessons.length, 0)
 
 function CoursePage() {
-  const { completed } = useCompletion()
+  const { completed, quizResults } = useCompletion()
   return (
     <div style={{ padding: '2rem', maxWidth: '640px' }}>
       <Link to="/dashboard">← Back to Dashboard</Link>
       <h1 style={{ fontSize: '1.75rem', margin: '0.75rem 0 0.5rem' }}>{COURSE.title}</h1>
       <p style={{ marginBottom: '1.5rem' }}>Progress: {completed.size} of {TOTAL_LESSONS} lessons completed</p>
-      {COURSE.sections.map((section) => (
-        <div key={section.id} style={{ marginBottom: '2rem' }}>
-          <h2 style={{ marginBottom: '0.5rem' }}>{section.title}</h2>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', paddingLeft: '0.5rem' }}>
-            {section.lessons.map((lesson) => (
-              <Link key={lesson.id} to={`/lesson/${lesson.id}`}>
-                {completed.has(lesson.id) ? '✓ ' : ''}{lesson.title}
-              </Link>
-            ))}
+      {COURSE.sections.map((section) => {
+        const quizResult = quizResults[section.id]
+        const quizLabel = quizResult === 'passed' ? '✓ Passed' : quizResult === 'failed' ? '✗ Failed' : 'Not started'
+        return (
+          <div key={section.id} style={{ marginBottom: '2rem' }}>
+            <h2 style={{ marginBottom: '0.5rem' }}>{section.title}</h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', paddingLeft: '0.5rem' }}>
+              {section.lessons.map((lesson) => (
+                <Link key={lesson.id} to={`/lesson/${lesson.id}`}>
+                  {completed.has(lesson.id) ? '✓ ' : ''}{lesson.title}
+                </Link>
+              ))}
+              <div style={{ marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <Link to={`/quiz/${section.id}`}>Start Quiz</Link>
+                <span style={{ fontSize: '0.85rem', color: quizResult === 'passed' ? 'green' : quizResult === 'failed' ? 'red' : '#666' }}>
+                  Quiz: {quizLabel}
+                </span>
+              </div>
+            </div>
           </div>
-        </div>
-      ))}
+        )
+      })}
     </div>
   )
 }
@@ -301,6 +381,113 @@ function ProtectedLesson() {
   )
 }
 
+function QuizPage() {
+  const { sectionId } = useParams<{ sectionId: string }>()
+  const { setQuizResult } = useCompletion()
+
+  const quiz = QUIZZES.find((q) => q.sectionId === sectionId)
+  const section = COURSE.sections.find((s) => s.id === sectionId)
+
+  const [currentIndex, setCurrentIndex] = useState(0)
+  const [answers, setAnswers] = useState<(number | null)[]>(() => quiz ? Array(quiz.questions.length).fill(null) : [])
+  const [showResults, setShowResults] = useState(false)
+
+  if (!quiz || !section) {
+    return (
+      <div style={{ padding: '2rem' }}>
+        <p>Quiz not found.</p>
+        <Link to="/course">← Back to Course</Link>
+      </div>
+    )
+  }
+
+  if (showResults) {
+    const correct = answers.filter((a, i) => a === quiz.questions[i].correctIndex).length
+    const total = quiz.questions.length
+    const passed = correct / total >= 0.8
+    return (
+      <div style={{ padding: '2rem', maxWidth: '640px' }}>
+        <Link to="/course">← Back to Course</Link>
+        <h1 style={{ fontSize: '1.75rem', margin: '0.75rem 0 0.5rem' }}>Quiz Results</h1>
+        <p style={{ marginBottom: '0.5rem' }}>You scored {correct} out of {total}.</p>
+        {passed ? (
+          <p style={{ color: 'green', fontWeight: 600 }}>Section passed.</p>
+        ) : (
+          <p style={{ color: 'red', fontWeight: 600 }}>You must review the section before retrying.</p>
+        )}
+        <div style={{ marginTop: '1.5rem', display: 'flex', gap: '1rem' }}>
+          {!passed && (
+            <button onClick={() => {
+              setAnswers(Array(quiz.questions.length).fill(null))
+              setCurrentIndex(0)
+              setShowResults(false)
+            }}>
+              Retry Quiz
+            </button>
+          )}
+          <Link to="/course">Back to Course</Link>
+        </div>
+      </div>
+    )
+  }
+
+  const question = quiz.questions[currentIndex]
+  const selected = answers[currentIndex]
+  const isLast = currentIndex === quiz.questions.length - 1
+
+  return (
+    <div style={{ padding: '2rem', maxWidth: '640px' }}>
+      <Link to="/course">← Back to Course</Link>
+      <p style={{ margin: '1rem 0 0.25rem', color: '#666', fontSize: '0.9rem' }}>{section.title}</p>
+      <h1 style={{ fontSize: '1.75rem', margin: '0.25rem 0 1rem' }}>Section Quiz</h1>
+      <p style={{ marginBottom: '1rem', fontSize: '0.9rem', color: '#666' }}>
+        Question {currentIndex + 1} of {quiz.questions.length}
+      </p>
+      <p style={{ fontWeight: 600, marginBottom: '1rem' }}>{question.question}</p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1.5rem' }}>
+        {question.options.map((option, i) => (
+          <label key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+            <input
+              type="radio"
+              name={`q-${question.id}`}
+              checked={selected === i}
+              onChange={() => setAnswers((prev) => { const next = [...prev]; next[currentIndex] = i; return next })}
+            />
+            {option}
+          </label>
+        ))}
+      </div>
+      <button
+        disabled={selected === null}
+        onClick={() => {
+          if (isLast) {
+            const correct = answers.filter((a, i) => a === quiz.questions[i].correctIndex).length
+            setQuizResult(section.id, correct / quiz.questions.length >= 0.8 ? 'passed' : 'failed')
+            setShowResults(true)
+          } else {
+            setCurrentIndex((i) => i + 1)
+          }
+        }}
+      >
+        {isLast ? 'Submit Quiz' : 'Next Question'}
+      </button>
+    </div>
+  )
+}
+
+function ProtectedQuiz() {
+  return (
+    <>
+      <SignedIn>
+        <QuizPage />
+      </SignedIn>
+      <SignedOut>
+        <Navigate to="/sign-in" replace />
+      </SignedOut>
+    </>
+  )
+}
+
 function ProtectedCourse() {
   return (
     <>
@@ -335,8 +522,12 @@ export default function App() {
     return next
   })
 
+  const [quizResults, setQuizResults] = useState<Record<string, QuizResult>>({})
+  const setQuizResult = (sectionId: string, result: QuizResult) =>
+    setQuizResults((prev) => ({ ...prev, [sectionId]: result }))
+
   return (
-    <CompletionContext.Provider value={{ completed, toggle }}>
+    <CompletionContext.Provider value={{ completed, toggle, quizResults, setQuizResult }}>
     <Routes>
       <Route path="/" element={<HomePage />} />
       <Route
@@ -350,6 +541,7 @@ export default function App() {
       <Route path="/dashboard" element={<ProtectedDashboard />} />
       <Route path="/course" element={<ProtectedCourse />} />
       <Route path="/lesson/:id" element={<ProtectedLesson />} />
+      <Route path="/quiz/:sectionId" element={<ProtectedQuiz />} />
     </Routes>
     </CompletionContext.Provider>
   )
