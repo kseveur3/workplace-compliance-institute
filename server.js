@@ -1,20 +1,37 @@
 import express from "express";
-import path from "path";
 import { fileURLToPath } from "url";
+import { dirname, join } from "path";
+import "dotenv/config";
+import Stripe from "stripe";
+import cors from "cors";
 
+const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const PORT = process.env.PORT || 3000;
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
-const distPath = path.join(__dirname, "dist");
+app.use(cors({ origin: "http://localhost:5173" }));
+app.use(express.json());
+app.use(express.static(join(__dirname, "dist")));
 
-app.use(express.static(distPath));
-
-app.use((_req, res) => {
-  res.sendFile(path.join(distPath, "index.html"));
+app.post("/create-checkout-session", async (_req, res) => {
+  try {
+    const session = await stripe.checkout.sessions.create({
+      mode: "payment",
+      line_items: [{ price: process.env.STRIPE_PRICE_ID, quantity: 1 }],
+      success_url: `${process.env.CLIENT_URL || "http://localhost:5173"}/checkout-success`,
+      cancel_url: `${process.env.CLIENT_URL || "http://localhost:5173"}/checkout-cancel`,
+    });
+    res.json({ url: session.url });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-const PORT = process.env.PORT || 3000;
+app.get("*", (_req, res) => {
+  res.sendFile(join(__dirname, "dist", "index.html"));
+});
+
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
