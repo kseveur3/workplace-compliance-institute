@@ -226,17 +226,29 @@ function useCompletion() {
 }
 
 function HomePage() {
-  const { paid, setPaidFlag } = useCompletion()
-  const navigate = useNavigate()
+  const { paid } = useCompletion()
+  const [purchasing, setPurchasing] = useState(false)
 
-  function handlePurchase() {
-    setPaidFlag()
-    navigate('/dashboard')
+  async function handlePurchase() {
+    setPurchasing(true)
+    try {
+      const base = import.meta.env.VITE_API_URL ?? ''
+      const res = await fetch(`${base}/create-checkout-session`, { method: 'POST' })
+      const data = await res.json()
+      if (data.url) {
+        window.location.href = data.url
+      } else {
+        setPurchasing(false)
+      }
+    } catch {
+      setPurchasing(false)
+    }
   }
 
   const purchaseBtn = (
     <button
       onClick={handlePurchase}
+      disabled={purchasing}
       style={{
         padding: '0.6rem 1.4rem',
         background: 'var(--text-h)',
@@ -244,11 +256,12 @@ function HomePage() {
         borderRadius: '4px',
         border: 'none',
         fontWeight: 600,
-        cursor: 'pointer',
+        cursor: purchasing ? 'default' : 'pointer',
         fontSize: '1rem',
+        opacity: purchasing ? 0.7 : 1,
       }}
     >
-      Purchase Certification
+      {purchasing ? 'Redirecting…' : 'Purchase Certification'}
     </button>
   )
 
@@ -288,7 +301,19 @@ function HomePage() {
             </Link>
           ) : (
             <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
-              {purchaseBtn}
+              <Link
+                to="/sign-up"
+                style={{
+                  padding: '0.6rem 1.4rem',
+                  background: 'var(--text-h)',
+                  color: 'var(--bg)',
+                  borderRadius: '4px',
+                  textDecoration: 'none',
+                  fontWeight: 600,
+                }}
+              >
+                Start Certification
+              </Link>
               <Link
                 to="/sign-in"
                 style={{
@@ -763,7 +788,7 @@ function VerifyPage() {
   const [email, setEmail] = useState('')
   const [result, setResult] = useState<{ email: string; courseName: string; completionDate: string } | 'not-found' | null>(null)
 
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+  function handleSubmit(e: { preventDefault(): void }) {
     e.preventDefault()
     const records: { email: string; courseName: string; completionDate: string }[] =
       JSON.parse(localStorage.getItem('wci_certifications') || '[]')
