@@ -109,3 +109,24 @@ code {
   padding: 4px 8px;
   background: var(--code-bg);
 }
+
+@media print {
+  body, #root {
+    background: #fff !important;
+    color: #000 !important;
+    border: none !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .certificate-body {
+    border-color: #ccc !important;
+    color: #000 !important;
+  }
+
+  .certificate-body * {
+    color: #000 !important;
+  }
+}

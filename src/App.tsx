@@ -206,6 +206,8 @@ interface CompletionContextValue {
   setQuizResult: (sectionId: string, result: QuizResult) => void
   finalExamResult: QuizResult | null
   setFinalExamResult: (result: QuizResult) => void
+  paid: boolean
+  setPaidFlag: () => void
 }
 
 const CompletionContext = createContext<CompletionContextValue>({
@@ -215,6 +217,8 @@ const CompletionContext = createContext<CompletionContextValue>({
   setQuizResult: () => {},
   finalExamResult: null,
   setFinalExamResult: () => {},
+  paid: false,
+  setPaidFlag: () => {},
 })
 
 function useCompletion() {
@@ -222,6 +226,32 @@ function useCompletion() {
 }
 
 function HomePage() {
+  const { paid, setPaidFlag } = useCompletion()
+  const navigate = useNavigate()
+
+  function handlePurchase() {
+    setPaidFlag()
+    navigate('/dashboard')
+  }
+
+  const purchaseBtn = (
+    <button
+      onClick={handlePurchase}
+      style={{
+        padding: '0.6rem 1.4rem',
+        background: 'var(--text-h)',
+        color: 'var(--bg)',
+        borderRadius: '4px',
+        border: 'none',
+        fontWeight: 600,
+        cursor: 'pointer',
+        fontSize: '1rem',
+      }}
+    >
+      Purchase Certification
+    </button>
+  )
+
   return (
     <div style={{ maxWidth: '640px', margin: '0 auto', padding: '4rem 2rem', textAlign: 'center' }}>
       <header style={{ marginBottom: '3rem' }}>
@@ -242,9 +272,9 @@ function HomePage() {
         </p>
 
         <SignedOut>
-          <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+          {paid ? (
             <Link
-              to="/sign-up"
+              to="/sign-in"
               style={{
                 padding: '0.6rem 1.4rem',
                 background: 'var(--text-h)',
@@ -254,38 +284,46 @@ function HomePage() {
                 fontWeight: 600,
               }}
             >
-              Start Certification
-            </Link>
-            <Link
-              to="/sign-in"
-              style={{
-                padding: '0.6rem 1.4rem',
-                border: '1px solid var(--text-h)',
-                borderRadius: '4px',
-                textDecoration: 'none',
-                fontWeight: 600,
-                color: 'var(--text-h)',
-              }}
-            >
               Log In
             </Link>
-          </div>
+          ) : (
+            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+              {purchaseBtn}
+              <Link
+                to="/sign-in"
+                style={{
+                  padding: '0.6rem 1.4rem',
+                  border: '1px solid var(--text-h)',
+                  borderRadius: '4px',
+                  textDecoration: 'none',
+                  fontWeight: 600,
+                  color: 'var(--text-h)',
+                }}
+              >
+                Log In
+              </Link>
+            </div>
+          )}
         </SignedOut>
 
         <SignedIn>
-          <Link
-            to="/dashboard"
-            style={{
-              padding: '0.6rem 1.4rem',
-              background: 'var(--text-h)',
-              color: 'var(--bg)',
-              borderRadius: '4px',
-              textDecoration: 'none',
-              fontWeight: 600,
-            }}
-          >
-            Go to Dashboard
-          </Link>
+          {paid ? (
+            <Link
+              to="/dashboard"
+              style={{
+                padding: '0.6rem 1.4rem',
+                background: 'var(--text-h)',
+                color: 'var(--bg)',
+                borderRadius: '4px',
+                textDecoration: 'none',
+                fontWeight: 600,
+              }}
+            >
+              Go to Dashboard
+            </Link>
+          ) : (
+            purchaseBtn
+          )}
         </SignedIn>
 
         <p style={{ marginTop: '2.5rem', fontSize: '0.85rem', color: '#666' }}>
@@ -354,19 +392,21 @@ function CoursePage() {
         </div>
       )}
 
-      <div style={{ marginBottom: '1.5rem', padding: '0.75rem 1rem', border: '1px solid var(--border)', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-        <span style={{ fontWeight: 600, color: eligible ? 'green' : '#666' }}>
-          {eligible ? '✓ Certification Unlocked' : '⊘ Certification Locked'}
-        </span>
-        {eligible ? (
-          <Link to="/final-exam">Take Final Exam</Link>
-        ) : (
-          <button disabled>Take Final Exam</button>
-        )}
-      </div>
-      {finalExamResult === 'passed' && (
-        <div style={{ marginBottom: '1.5rem' }}>
+      {finalExamResult === 'passed' ? (
+        <div style={{ marginBottom: '1.5rem', padding: '0.75rem 1rem', border: '1px solid var(--border)', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <span style={{ fontWeight: 600, color: 'green' }}>✓ Certified</span>
           <Link to="/certificate">View Certificate →</Link>
+        </div>
+      ) : (
+        <div style={{ marginBottom: '1.5rem', padding: '0.75rem 1rem', border: '1px solid var(--border)', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <span style={{ fontWeight: 600, color: eligible ? 'green' : '#666' }}>
+            {eligible ? '✓ Certification Unlocked' : '⊘ Certification Locked'}
+          </span>
+          {eligible ? (
+            <Link to="/final-exam">Take Final Exam</Link>
+          ) : (
+            <button disabled>Take Final Exam</button>
+          )}
         </div>
       )}
 
@@ -471,12 +511,8 @@ function LessonPage() {
 function ProtectedLesson() {
   return (
     <>
-      <SignedIn>
-        <LessonPage />
-      </SignedIn>
-      <SignedOut>
-        <Navigate to="/sign-in" replace />
-      </SignedOut>
+      <SignedIn><PaidGuard><LessonPage /></PaidGuard></SignedIn>
+      <SignedOut><Navigate to="/sign-in" replace /></SignedOut>
     </>
   )
 }
@@ -550,18 +586,14 @@ function QuizPage() {
 function ProtectedQuiz() {
   return (
     <>
-      <SignedIn>
-        <QuizPage />
-      </SignedIn>
-      <SignedOut>
-        <Navigate to="/sign-in" replace />
-      </SignedOut>
+      <SignedIn><PaidGuard><QuizPage /></PaidGuard></SignedIn>
+      <SignedOut><Navigate to="/sign-in" replace /></SignedOut>
     </>
   )
 }
 
 function FinalExamPage() {
-  const { completed, quizResults, setFinalExamResult } = useCompletion()
+  const { completed, quizResults, finalExamResult, setFinalExamResult } = useCompletion()
   const { user } = useUser()
   const allLessonsDone = ALL_LESSONS.every((l) => completed.has(l.id))
   const allQuizzesPassed = COURSE.sections.every((s) => quizResults[s.id] === 'passed')
@@ -576,6 +608,18 @@ function FinalExamPage() {
       <div style={{ padding: '2rem' }}>
         <p>You must complete all lessons and pass all section quizzes before taking the final exam.</p>
         <Link to="/course">← Back to Course</Link>
+      </div>
+    )
+  }
+
+  if (finalExamResult === 'passed') {
+    return (
+      <div style={{ padding: '2rem' }}>
+        <p>Final exam already passed.</p>
+        <div style={{ marginTop: '1rem', display: 'flex', gap: '1rem' }}>
+          <Link to="/certificate">View Certificate</Link>
+          <Link to="/course">Back to Course</Link>
+        </div>
       </div>
     )
   }
@@ -676,21 +720,41 @@ function CertificatePage() {
   const date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
 
   return (
-    <div style={{ padding: '3rem 2rem', maxWidth: '600px', margin: '0 auto', textAlign: 'center' }}>
-      <h1 style={{ fontSize: '1.75rem', margin: '0 0 0.5rem' }}>Certificate of Completion</h1>
-      <p style={{ color: '#666', fontSize: '0.9rem', margin: '0 0 2rem' }}>{date}</p>
-
-      <div style={{ border: '1px solid var(--border)', borderRadius: '4px', padding: '2rem', marginBottom: '2rem' }}>
-        <p style={{ margin: '0 0 1rem', lineHeight: '1.7' }}>
-          This certifies that <strong>{email}</strong> has successfully completed the{' '}
-          <strong>EEO Investigator Certification</strong>.
-        </p>
-        <p style={{ margin: 0, color: '#666', fontSize: '0.9rem' }}>
-          Issued by Workplace Compliance Institute
-        </p>
+    <div style={{ padding: '3rem 2rem', maxWidth: '680px', margin: '0 auto', textAlign: 'center' }}>
+      <div className="no-print" style={{ marginBottom: '1.5rem', display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+        <Link to="/course">← Back to Course</Link>
+        <button onClick={() => window.print()}>Download PDF</button>
       </div>
 
-      <Link to="/course">← Back to Course</Link>
+      <div className="certificate-body" style={{
+        border: '2px solid var(--border)',
+        borderRadius: '6px',
+        padding: '3.5rem 3rem',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: '1.5rem',
+      }}>
+        <p style={{ margin: 0, fontSize: '0.85rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: '#888' }}>
+          Workplace Compliance Institute
+        </p>
+
+        <h1 style={{ fontSize: '2rem', margin: 0, letterSpacing: '-0.5px' }}>Certificate of Completion</h1>
+
+        <p style={{ margin: 0, color: '#888', fontSize: '0.9rem' }}>This certifies that</p>
+
+        <p style={{ margin: 0, fontSize: '1.4rem', fontWeight: 600 }}>{email}</p>
+
+        <p style={{ margin: 0, lineHeight: '1.7', maxWidth: '440px' }}>
+          has successfully completed the course
+        </p>
+
+        <p style={{ margin: 0, fontSize: '1.15rem', fontWeight: 600 }}>EEO Investigator Certification</p>
+
+        <div style={{ width: '4rem', borderTop: '1px solid var(--border)' }} />
+
+        <p style={{ margin: 0, color: '#888', fontSize: '0.9rem' }}>Issued {date}</p>
+      </div>
     </div>
   )
 }
@@ -748,12 +812,8 @@ function VerifyPage() {
 function ProtectedCertificate() {
   return (
     <>
-      <SignedIn>
-        <CertificatePage />
-      </SignedIn>
-      <SignedOut>
-        <Navigate to="/sign-in" replace />
-      </SignedOut>
+      <SignedIn><PaidGuard><CertificatePage /></PaidGuard></SignedIn>
+      <SignedOut><Navigate to="/sign-in" replace /></SignedOut>
     </>
   )
 }
@@ -761,25 +821,23 @@ function ProtectedCertificate() {
 function ProtectedFinalExam() {
   return (
     <>
-      <SignedIn>
-        <FinalExamPage />
-      </SignedIn>
-      <SignedOut>
-        <Navigate to="/sign-in" replace />
-      </SignedOut>
+      <SignedIn><PaidGuard><FinalExamPage /></PaidGuard></SignedIn>
+      <SignedOut><Navigate to="/sign-in" replace /></SignedOut>
     </>
   )
+}
+
+function PaidGuard({ children }: { children: React.ReactNode }) {
+  const { paid } = useCompletion()
+  if (!paid) return <Navigate to="/" replace />
+  return <>{children}</>
 }
 
 function ProtectedCourse() {
   return (
     <>
-      <SignedIn>
-        <CoursePage />
-      </SignedIn>
-      <SignedOut>
-        <Navigate to="/sign-in" replace />
-      </SignedOut>
+      <SignedIn><PaidGuard><CoursePage /></PaidGuard></SignedIn>
+      <SignedOut><Navigate to="/sign-in" replace /></SignedOut>
     </>
   )
 }
@@ -798,21 +856,53 @@ function ProtectedDashboard() {
 }
 
 export default function App() {
-  const [completed, setCompleted] = useState<Set<string>>(new Set())
+  const [completed, setCompleted] = useState<Set<string>>(() => {
+    try {
+      const stored = localStorage.getItem('wci_completed_lessons')
+      return stored ? new Set(JSON.parse(stored)) : new Set()
+    } catch {
+      return new Set()
+    }
+  })
   const toggle = (id: string) => setCompleted((prev) => {
     const next = new Set(prev)
     next.has(id) ? next.delete(id) : next.add(id)
+    localStorage.setItem('wci_completed_lessons', JSON.stringify([...next]))
     return next
   })
 
-  const [quizResults, setQuizResults] = useState<Record<string, QuizResult>>({})
+  const [quizResults, setQuizResults] = useState<Record<string, QuizResult>>(() => {
+    try {
+      const stored = localStorage.getItem('wci_quiz_results')
+      return stored ? JSON.parse(stored) : {}
+    } catch {
+      return {}
+    }
+  })
   const setQuizResult = (sectionId: string, result: QuizResult) =>
-    setQuizResults((prev) => ({ ...prev, [sectionId]: result }))
+    setQuizResults((prev) => {
+      const next = { ...prev, [sectionId]: result }
+      localStorage.setItem('wci_quiz_results', JSON.stringify(next))
+      return next
+    })
 
-  const [finalExamResult, setFinalExamResult] = useState<QuizResult | null>(null)
+  const [finalExamResult, setFinalExamResultState] = useState<QuizResult | null>(() => {
+    const stored = localStorage.getItem('wci_final_exam_result')
+    return stored === 'passed' || stored === 'failed' ? stored : null
+  })
+  const setFinalExamResult = (result: QuizResult) => {
+    localStorage.setItem('wci_final_exam_result', result)
+    setFinalExamResultState(result)
+  }
+
+  const [paid, setPaidState] = useState<boolean>(() => localStorage.getItem('wci_paid_user') === 'true')
+  const setPaidFlag = () => {
+    localStorage.setItem('wci_paid_user', 'true')
+    setPaidState(true)
+  }
 
   return (
-    <CompletionContext.Provider value={{ completed, toggle, quizResults, setQuizResult, finalExamResult, setFinalExamResult }}>
+    <CompletionContext.Provider value={{ completed, toggle, quizResults, setQuizResult, finalExamResult, setFinalExamResult, paid, setPaidFlag }}>
     <Routes>
       <Route path="/" element={<HomePage />} />
       <Route
