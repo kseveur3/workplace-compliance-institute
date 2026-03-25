@@ -19,8 +19,8 @@ app.post("/create-checkout-session", async (_req, res) => {
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       line_items: [{ price: process.env.STRIPE_PRICE_ID, quantity: 1 }],
-      success_url: `${process.env.CLIENT_URL || "http://localhost:5173"}/dashboard`,
-      cancel_url: `${process.env.CLIENT_URL || "http://localhost:5173"}/`,
+      success_url: `${process.env.CLIENT_URL || "http://localhost:5173"}/checkout-success`,
+      cancel_url: `${process.env.CLIENT_URL || "http://localhost:5173"}/checkout-cancel`,
     });
     res.json({ url: session.url });
   } catch (err) {

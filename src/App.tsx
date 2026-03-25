@@ -1,4 +1,4 @@
-import { useState, createContext, useContext } from 'react'
+import { useState, useEffect, createContext, useContext } from 'react'
 import { Routes, Route, Link, Navigate, useParams, useNavigate, useLocation } from 'react-router-dom'
 import { SignIn, SignUp, SignedIn, SignedOut, SignOutButton, useUser } from '@clerk/clerk-react'
 
@@ -852,6 +852,32 @@ function ProtectedFinalExam() {
   )
 }
 
+function CheckoutSuccessPage() {
+  const { setPaidFlag } = useCompletion()
+
+  useEffect(() => {
+    setPaidFlag()
+  }, [])
+
+  return (
+    <div style={{ padding: '3rem 2rem', maxWidth: '500px', margin: '0 auto', textAlign: 'center' }}>
+      <h1 style={{ fontSize: '1.75rem', margin: '0 0 1rem' }}>Payment Successful</h1>
+      <p style={{ color: '#666', marginBottom: '2rem' }}>Your certification purchase was successful.</p>
+      <Link to="/dashboard">Continue to Dashboard →</Link>
+    </div>
+  )
+}
+
+function CheckoutCancelPage() {
+  return (
+    <div style={{ padding: '3rem 2rem', maxWidth: '500px', margin: '0 auto', textAlign: 'center' }}>
+      <h1 style={{ fontSize: '1.75rem', margin: '0 0 1rem' }}>Checkout Canceled</h1>
+      <p style={{ color: '#666', marginBottom: '2rem' }}>Your purchase was not completed.</p>
+      <Link to="/">Return Home →</Link>
+    </div>
+  )
+}
+
 function PaidGuard({ children }: { children: React.ReactNode }) {
   const { paid } = useCompletion()
   if (!paid) return <Navigate to="/" replace />
@@ -945,6 +971,8 @@ export default function App() {
       <Route path="/final-exam" element={<ProtectedFinalExam />} />
       <Route path="/certificate" element={<ProtectedCertificate />} />
       <Route path="/verify" element={<VerifyPage />} />
+      <Route path="/checkout-success" element={<CheckoutSuccessPage />} />
+      <Route path="/checkout-cancel" element={<CheckoutCancelPage />} />
     </Routes>
     </CompletionContext.Provider>
   )
