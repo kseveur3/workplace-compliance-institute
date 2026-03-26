@@ -5,8 +5,8 @@ import { createRequire } from "module";
 import "dotenv/config";
 import Stripe from "stripe";
 import cors from "cors";
-import { PrismaClient } from "@prisma/client";
-
+import pkg from "@prisma/client";
+const { PrismaClient } = pkg;
 const require = createRequire(import.meta.url);
 const { PrismaBetterSqlite3 } = require("@prisma/adapter-better-sqlite3");
 
@@ -34,7 +34,7 @@ app.post(
       event = stripe.webhooks.constructEvent(
         req.body,
         sig,
-        process.env.STRIPE_WEBHOOK_SECRET
+        process.env.STRIPE_WEBHOOK_SECRET,
       );
     } catch (err) {
       console.error("Webhook signature verification failed:", err.message);
@@ -54,7 +54,9 @@ app.post(
 
       if (!clerkUserId) {
         console.error("Missing clerkUserId in session metadata:", session.id);
-        return res.status(400).json({ error: "Missing clerkUserId in metadata" });
+        return res
+          .status(400)
+          .json({ error: "Missing clerkUserId in metadata" });
       }
 
       await prisma.paidUser.upsert({
@@ -67,7 +69,7 @@ app.post(
     }
 
     res.json({ received: true });
-  }
+  },
 );
 
 // ── Standard JSON middleware (after webhook route) ────────────────────────────
