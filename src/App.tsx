@@ -1,6 +1,7 @@
 import { useState, useEffect, createContext, useContext } from 'react'
 import { Routes, Route, Link, Navigate, useParams, useNavigate, useLocation } from 'react-router-dom'
 import { SignIn, SignUp, SignedIn, SignedOut, SignOutButton, useUser } from '@clerk/clerk-react'
+import './app.css'
 
 interface Lesson {
   id: string
@@ -155,7 +156,7 @@ const COURSE: Course = {
           content: [
             'Title VII of the Civil Rights Act of 1964 prohibits employment discrimination based on race, color, religion, sex, and national origin. It applies to employers with 15 or more employees, including federal agencies.',
             'Title VII covers all aspects of employment: hiring, firing, pay, job assignments, promotions, layoffs, training, fringe benefits, and any other term or condition of employment.',
-            'Amendments and related statutes — including the Pregnancy Discrimination Act and Title II of the Genetic Information Nondiscrimination Act — have expanded Title VII\'s protections over time.',
+            "Amendments and related statutes — including the Pregnancy Discrimination Act and Title II of the Genetic Information Nondiscrimination Act — have expanded Title VII's protections over time.",
             'Investigators must be familiar with the basic elements of a Title VII claim, including the concept of adverse action and the requirement that the protected characteristic be a motivating factor in the employment decision.',
           ],
           narrationPlaceholder: 'Audio narration for Title VII Basics coming soon.',
@@ -172,8 +173,8 @@ const COURSE: Course = {
           estimatedTime: 'Estimated time: 20 minutes',
           content: [
             'Disparate treatment is the most common theory of discrimination. It occurs when an employer treats an employee less favorably than similarly situated employees because of a protected characteristic.',
-            'To establish a disparate treatment claim, a complainant must show that: they are a member of a protected class, they suffered an adverse employment action, and there is an inference that the action was motivated by discriminatory intent.',
-            'Investigators look for comparative evidence — how were employees outside the complainant\'s protected class treated under similar circumstances? Inconsistencies in disciplinary records, promotions, or performance reviews are key indicators.',
+            "To establish a disparate treatment claim, a complainant must show that: they are a member of a protected class, they suffered an adverse employment action, and there is an inference that the action was motivated by discriminatory intent.",
+            "Investigators look for comparative evidence — how were employees outside the complainant's protected class treated under similar circumstances? Inconsistencies in disciplinary records, promotions, or performance reviews are key indicators.",
             'Direct evidence of discriminatory intent, such as a discriminatory statement by a decision-maker, is rare. Most cases rely on circumstantial evidence and the burden-shifting framework established in McDonnell Douglas Corp. v. Green.',
           ],
           narrationPlaceholder: 'Audio narration for Disparate Treatment coming soon.',
@@ -207,7 +208,8 @@ interface CompletionContextValue {
   finalExamResult: QuizResult | null
   setFinalExamResult: (result: QuizResult) => void
   paid: boolean
-  setPaidFlag: () => void
+  paidLoading: boolean
+  refetchPaidStatus: () => void
 }
 
 const CompletionContext = createContext<CompletionContextValue>({
@@ -218,241 +220,274 @@ const CompletionContext = createContext<CompletionContextValue>({
   finalExamResult: null,
   setFinalExamResult: () => {},
   paid: false,
-  setPaidFlag: () => {},
+  paidLoading: true,
+  refetchPaidStatus: () => {},
 })
 
 function useCompletion() {
   return useContext(CompletionContext)
 }
 
+// ─── Home Page ────────────────────────────────────────────────────────────────
+
 function HomePage() {
   const { paid } = useCompletion()
+  const { user } = useUser()
   const [purchasing, setPurchasing] = useState(false)
 
   async function handlePurchase() {
     setPurchasing(true)
     try {
       const base = import.meta.env.VITE_API_URL ?? ''
-      const res = await fetch(`${base}/create-checkout-session`, { method: 'POST' })
+      const res = await fetch(`${base}/create-checkout-session`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clerkUserId: user?.id }),
+      })
       const data = await res.json()
-      if (data.url) {
-        window.location.href = data.url
-      } else {
-        setPurchasing(false)
-      }
+      if (data.url) window.location.href = data.url
+      else setPurchasing(false)
     } catch {
       setPurchasing(false)
     }
   }
 
-  const purchaseBtn = (
-    <button
-      onClick={handlePurchase}
-      disabled={purchasing}
-      style={{
-        padding: '0.6rem 1.4rem',
-        background: 'var(--text-h)',
-        color: 'var(--bg)',
-        borderRadius: '4px',
-        border: 'none',
-        fontWeight: 600,
-        cursor: purchasing ? 'default' : 'pointer',
-        fontSize: '1rem',
-        opacity: purchasing ? 0.7 : 1,
-      }}
-    >
-      {purchasing ? 'Redirecting…' : 'Purchase Certification'}
-    </button>
-  )
-
   return (
-    <div style={{ maxWidth: '640px', margin: '0 auto', padding: '4rem 2rem', textAlign: 'center' }}>
-      <header style={{ marginBottom: '3rem' }}>
-        <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700 }}>
-          Workplace Compliance Institute
-        </h1>
-        <p style={{ margin: '0.25rem 0 0', color: '#555', fontSize: '0.95rem' }}>
-          Professional Certification &amp; Training
-        </p>
+    <div className="home-shell">
+      <header className="home-brand">
+        <h1>Workplace Compliance Institute</h1>
+        <hr className="home-brand-rule" />
+        <p>Professional Certification &amp; Training</p>
       </header>
 
       <main>
-        <h2 style={{ fontSize: '2rem', margin: '0 0 1rem' }}>
-          EEO Investigator Certification
-        </h2>
-        <p style={{ color: '#444', lineHeight: '1.6', margin: '0 0 2rem' }}>
-          Complete a 40-hour, self-paced training program and earn a verifiable certification.
+        <h2 className="home-cta-title">EEO Investigator Certification</h2>
+        <p className="home-cta-desc">
+          Complete a self-paced training program and earn a verifiable certification in federal equal employment opportunity law and investigation.
         </p>
 
         <SignedOut>
           {paid ? (
-            <Link
-              to="/sign-in"
-              style={{
-                padding: '0.6rem 1.4rem',
-                background: 'var(--text-h)',
-                color: 'var(--bg)',
-                borderRadius: '4px',
-                textDecoration: 'none',
-                fontWeight: 600,
-              }}
-            >
-              Log In
-            </Link>
+            <Link to="/sign-in" className="btn-primary">Log In</Link>
           ) : (
-            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
-              <Link
-                to="/sign-up"
-                style={{
-                  padding: '0.6rem 1.4rem',
-                  background: 'var(--text-h)',
-                  color: 'var(--bg)',
-                  borderRadius: '4px',
-                  textDecoration: 'none',
-                  fontWeight: 600,
-                }}
-              >
-                Start Certification
-              </Link>
-              <Link
-                to="/sign-in"
-                style={{
-                  padding: '0.6rem 1.4rem',
-                  border: '1px solid var(--text-h)',
-                  borderRadius: '4px',
-                  textDecoration: 'none',
-                  fontWeight: 600,
-                  color: 'var(--text-h)',
-                }}
-              >
-                Log In
-              </Link>
+            <div className="home-btn-row">
+              <Link to="/sign-up" className="btn-primary">Start Certification</Link>
+              <Link to="/sign-in" className="btn-secondary">Log In</Link>
             </div>
           )}
         </SignedOut>
 
         <SignedIn>
           {paid ? (
-            <Link
-              to="/dashboard"
-              style={{
-                padding: '0.6rem 1.4rem',
-                background: 'var(--text-h)',
-                color: 'var(--bg)',
-                borderRadius: '4px',
-                textDecoration: 'none',
-                fontWeight: 600,
-              }}
-            >
-              Go to Dashboard
-            </Link>
+            <Link to="/dashboard" className="btn-primary">Go to Dashboard</Link>
           ) : (
-            purchaseBtn
+            <button
+              onClick={handlePurchase}
+              disabled={purchasing}
+              className="btn-teal"
+              style={{ opacity: purchasing ? 0.7 : 1 }}
+            >
+              {purchasing ? 'Redirecting…' : 'Purchase Certification'}
+            </button>
           )}
         </SignedIn>
 
-        <p style={{ marginTop: '2.5rem', fontSize: '0.85rem', color: '#666' }}>
-          <Link to="/verify" style={{ color: '#666' }}>Verify a Certificate</Link>
+        <p className="home-verify-link">
+          <Link to="/verify">Verify a Certificate</Link>
         </p>
       </main>
     </div>
   )
 }
 
+// ─── Dashboard ────────────────────────────────────────────────────────────────
+
 function DashboardPage() {
   const { user } = useUser()
+  const { completed, quizResults } = useCompletion()
+  const totalLessons = COURSE.sections.reduce((sum, s) => sum + s.lessons.length, 0)
+  const quizzesPassed = COURSE.sections.filter((s) => quizResults[s.id] === 'passed').length
 
   return (
-    <div style={{ padding: '2rem' }}>
-      <h1>Dashboard</h1>
-      <p>{user?.primaryEmailAddress?.emailAddress}</p>
-      <div style={{ marginTop: '1rem', display: 'flex', gap: '1rem' }}>
-        <Link to="/course">Start Course</Link>
+    <div className="page-shell">
+      <div className="dash-header">
+        <h1 className="dash-title">Dashboard</h1>
+        <p className="dash-meta">{user?.primaryEmailAddress?.emailAddress}</p>
+      </div>
+
+      <hr className="dash-divider" />
+
+      <div
+        className="info-panel info-panel--warm info-panel--featured"
+        style={{ marginBottom: 'var(--sp-6)' }}
+      >
+        <p className="info-panel__title">EEO Investigator Certification</p>
+        <p className="dash-course-desc">
+          A structured program covering federal equal employment opportunity law,
+          complaint investigation procedures, and agency compliance standards.
+        </p>
+        <p className="dash-course-progress">
+          {completed.size} of {totalLessons} lessons completed
+          {quizzesPassed > 0 &&
+            ` · ${quizzesPassed} of ${COURSE.sections.length} section quizzes passed`}
+        </p>
+      </div>
+
+      <div className="action-row">
+        <Link to="/course" className="link-btn">View Course</Link>
         <SignOutButton />
       </div>
     </div>
   )
 }
 
+// ─── Course Page ──────────────────────────────────────────────────────────────
+
 const TOTAL_LESSONS = COURSE.sections.reduce((sum, s) => sum + s.lessons.length, 0)
 
 function CoursePage() {
   const { completed, quizResults, finalExamResult } = useCompletion()
   const location = useLocation()
-  const quizSummary = (location.state as { quizSummary?: { correct: number; total: number; passed: boolean; sectionTitle: string } } | null)?.quizSummary
+  const quizSummary = (
+    location.state as {
+      quizSummary?: {
+        correct: number
+        total: number
+        passed: boolean
+        sectionTitle: string
+      }
+    } | null
+  )?.quizSummary
 
   const allLessonsDone = ALL_LESSONS.every((l) => completed.has(l.id))
   const allQuizzesPassed = COURSE.sections.every((s) => quizResults[s.id] === 'passed')
   const eligible = allLessonsDone && allQuizzesPassed
 
   return (
-    <div style={{ padding: '2rem', maxWidth: '640px' }}>
-      <Link to="/dashboard">← Back to Dashboard</Link>
-      <h1 style={{ fontSize: '1.75rem', margin: '0.75rem 0 0.5rem' }}>{COURSE.title}</h1>
-      <p style={{ marginBottom: '0.75rem' }}>Progress: {completed.size} of {TOTAL_LESSONS} lessons completed</p>
+    <div className="page-shell">
+      <Link to="/dashboard" className="page-back-link">← Back to Dashboard</Link>
 
-      <div style={{ marginBottom: '1.5rem', padding: '0.75rem 1rem', border: '1px solid var(--border)', borderRadius: '4px' }}>
-        <p style={{ fontWeight: 600, margin: '0 0 0.5rem' }}>Certification Requirements</p>
-        <ul style={{ margin: 0, paddingLeft: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-          <li style={{ color: allLessonsDone ? 'green' : 'inherit' }}>
+      <div className="page-header">
+        <h1 className="page-title">{COURSE.title}</h1>
+        <p className="page-subtitle">
+          Progress: {completed.size} of {TOTAL_LESSONS} lessons completed
+        </p>
+      </div>
+
+      {/* Certification requirements */}
+      <div className="info-panel" style={{ marginBottom: 'var(--sp-5)' }}>
+        <p className="info-panel__title">Certification Requirements</p>
+        <ul className="req-list">
+          <li style={{ color: allLessonsDone ? 'var(--color-success)' : 'inherit' }}>
             All lessons completed: {allLessonsDone ? '✓ Yes' : 'No'}
           </li>
-          <li style={{ color: allQuizzesPassed ? 'green' : 'inherit' }}>
+          <li style={{ color: allQuizzesPassed ? 'var(--color-success)' : 'inherit' }}>
             All section quizzes passed: {allQuizzesPassed ? '✓ Yes' : 'No'}
           </li>
-          <li style={{ color: finalExamResult === 'passed' ? 'green' : finalExamResult === 'failed' ? 'red' : 'inherit' }}>
+          <li
+            style={{
+              color:
+                finalExamResult === 'passed'
+                  ? 'var(--color-success)'
+                  : finalExamResult === 'failed'
+                  ? 'var(--color-error)'
+                  : 'inherit',
+            }}
+          >
             Final exam:{' '}
-            {finalExamResult === 'passed' ? '✓ Passed' : finalExamResult === 'failed' ? '✗ Failed' : 'Not started'}
+            {finalExamResult === 'passed'
+              ? '✓ Passed'
+              : finalExamResult === 'failed'
+              ? '✗ Failed'
+              : 'Not started'}
           </li>
         </ul>
       </div>
 
+      {/* Quiz result notice */}
       {quizSummary && (
-        <div style={{ marginBottom: '1rem', padding: '0.75rem 1rem', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '0.9rem' }}>
-          <strong>{quizSummary.sectionTitle}:</strong>{' '}
-          You scored {quizSummary.correct} out of {quizSummary.total}.{' '}
-          <span style={{ color: quizSummary.passed ? 'green' : 'red', fontWeight: 600 }}>
-            {quizSummary.passed ? 'Section passed.' : 'You must review the section before retrying.'}
+        <div className="info-panel info-panel--notice" style={{ marginBottom: 'var(--sp-5)' }}>
+          <strong>{quizSummary.sectionTitle}:</strong> You scored {quizSummary.correct} out of{' '}
+          {quizSummary.total}.{' '}
+          <span
+            style={{
+              color: quizSummary.passed ? 'var(--color-success)' : 'var(--color-error)',
+              fontWeight: 600,
+            }}
+          >
+            {quizSummary.passed
+              ? 'Section passed.'
+              : 'You must review the section before retrying.'}
           </span>
         </div>
       )}
 
+      {/* Certification / exam status bar */}
       {finalExamResult === 'passed' ? (
-        <div style={{ marginBottom: '1.5rem', padding: '0.75rem 1rem', border: '1px solid var(--border)', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <span style={{ fontWeight: 600, color: 'green' }}>✓ Certified</span>
+        <div className="status-bar status-bar--certified">
+          <span className="status-label" style={{ color: 'var(--color-gold)' }}>
+            ✓ Certified
+          </span>
           <Link to="/certificate">View Certificate →</Link>
         </div>
       ) : (
-        <div style={{ marginBottom: '1.5rem', padding: '0.75rem 1rem', border: '1px solid var(--border)', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <span style={{ fontWeight: 600, color: eligible ? 'green' : '#666' }}>
+        <div className="status-bar">
+          <span
+            className="status-label"
+            style={{
+              color: eligible ? 'var(--color-success)' : 'var(--text-muted)',
+            }}
+          >
             {eligible ? '✓ Certification Unlocked' : '⊘ Certification Locked'}
           </span>
           {eligible ? (
-            <Link to="/final-exam">Take Final Exam</Link>
+            <Link to="/final-exam" className="btn-primary" style={{ fontSize: '0.75rem' }}>
+              Take Final Exam
+            </Link>
           ) : (
-            <button disabled>Take Final Exam</button>
+            <button disabled className="btn-primary" style={{ fontSize: '0.75rem', opacity: 0.35, cursor: 'not-allowed' }}>
+              Take Final Exam
+            </button>
           )}
         </div>
       )}
 
+      {/* Sections */}
       {COURSE.sections.map((section) => {
         const quizResult = quizResults[section.id]
-        const quizLabel = quizResult === 'passed' ? '✓ Passed' : quizResult === 'failed' ? '✗ Failed' : 'Not started'
+        const quizLabel =
+          quizResult === 'passed'
+            ? '✓ Passed'
+            : quizResult === 'failed'
+            ? '✗ Failed'
+            : 'Not started'
+
         return (
-          <div key={section.id} style={{ marginBottom: '2rem' }}>
-            <h2 style={{ marginBottom: '0.5rem' }}>{section.title}</h2>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', paddingLeft: '0.5rem' }}>
+          <div key={section.id} className="section-block">
+            <h2>{section.title}</h2>
+            <div className="lesson-list">
               {section.lessons.map((lesson) => (
                 <Link key={lesson.id} to={`/lesson/${lesson.id}`}>
-                  {completed.has(lesson.id) ? '✓ ' : ''}{lesson.title}
+                  {completed.has(lesson.id) ? '✓ ' : ''}
+                  {lesson.title}
                 </Link>
               ))}
-              <div style={{ marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                <Link to={`/quiz/${section.id}`}>Start Quiz</Link>
-                <span style={{ fontSize: '0.85rem', color: quizResult === 'passed' ? 'green' : quizResult === 'failed' ? 'red' : '#666' }}>
-                  Quiz: {quizLabel}
-                </span>
-              </div>
+            </div>
+            <div className="quiz-row">
+              <Link to={`/quiz/${section.id}`}>Start Quiz</Link>
+              <span
+                className="quiz-status"
+                style={{
+                  color:
+                    quizResult === 'passed'
+                      ? 'var(--color-success)'
+                      : quizResult === 'failed'
+                      ? 'var(--color-error)'
+                      : 'var(--text-muted)',
+                }}
+              >
+                Quiz: {quizLabel}
+              </span>
             </div>
           </div>
         )
@@ -461,11 +496,17 @@ function CoursePage() {
   )
 }
 
+// ─── Lesson Page ──────────────────────────────────────────────────────────────
+
 function LessonPage() {
   const { id } = useParams<{ id: string }>()
   const { completed, toggle } = useCompletion()
 
-  let foundLesson: { section: (typeof COURSE.sections)[0]; lesson: (typeof COURSE.sections)[0]['lessons'][0] } | null = null
+  let foundLesson: {
+    section: (typeof COURSE.sections)[0]
+    lesson: (typeof COURSE.sections)[0]['lessons'][0]
+  } | null = null
+
   for (const section of COURSE.sections) {
     const lesson = section.lessons.find((l) => l.id === id)
     if (lesson) {
@@ -476,9 +517,9 @@ function LessonPage() {
 
   if (!foundLesson) {
     return (
-      <div style={{ padding: '2rem' }}>
+      <div className="page-shell">
         <p>Lesson not found.</p>
-        <Link to="/course">← Back to Course</Link>
+        <Link to="/course" className="page-back-link">← Back to Course</Link>
       </div>
     )
   }
@@ -490,42 +531,45 @@ function LessonPage() {
   const isDone = completed.has(lesson.id)
 
   return (
-    <div style={{ padding: '2rem', maxWidth: '640px' }}>
-      <Link to="/course">← Back to Course</Link>
-      <p style={{ margin: '1rem 0 0.25rem', color: '#666', fontSize: '0.9rem' }}>{section.title}</p>
-      <h1 style={{ fontSize: '1.75rem', margin: '0.25rem 0 0.25rem' }}>{lesson.title}</h1>
-      <p style={{ color: '#666', fontSize: '0.9rem', margin: '0 0 1.5rem' }}>{lesson.estimatedTime}</p>
+    <div className="page-shell">
+      <Link to="/course" className="page-back-link">← Back to Course</Link>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '2rem' }}>
+      <div className="lesson-header">
+        <p className="lesson-section-label">{section.title}</p>
+        <h1 className="lesson-title">{lesson.title}</h1>
+        <p className="lesson-meta">{lesson.estimatedTime}</p>
+      </div>
+
+      <div className="lesson-body">
         {lesson.content.map((p, i) => (
           <p key={i}>{p}</p>
         ))}
       </div>
 
-      <div style={{
-        border: '1px solid var(--border)',
-        borderRadius: '4px',
-        padding: '1rem',
-        marginBottom: '2rem',
-        color: '#666',
-      }}>
-        {lesson.narrationPlaceholder}
-      </div>
+      <div className="lesson-audio">{lesson.narrationPlaceholder}</div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2rem' }}>
+      <div className="lesson-complete-row">
         <button onClick={() => toggle(lesson.id)}>
           {isDone ? 'Mark as Incomplete' : 'Mark as Complete'}
         </button>
-        <span style={{ color: isDone ? 'green' : '#666', fontSize: '0.9rem' }}>
+        <span
+          className="lesson-complete-status"
+          style={{ color: isDone ? 'var(--color-success)' : 'var(--text-muted)' }}
+        >
           {isDone ? '✓ Completed' : 'Not completed'}
         </span>
       </div>
 
-      <div style={{ display: 'flex', gap: '1rem' }}>
-        {prevLesson && <Link to={`/lesson/${prevLesson.id}`}>← Previous Lesson</Link>}
+      <div className="lesson-nav">
+        {prevLesson ? (
+          <Link to={`/lesson/${prevLesson.id}`}>← Previous Lesson</Link>
+        ) : (
+          <span />
+        )}
         {nextLesson && <Link to={`/lesson/${nextLesson.id}`}>Next Lesson →</Link>}
       </div>
-      <div style={{ marginTop: '0.75rem', display: 'flex', gap: '1rem' }}>
+
+      <div className="lesson-nav-back">
         <Link to="/course">Back to Course</Link>
         <Link to="/dashboard">Back to Dashboard</Link>
       </div>
@@ -533,14 +577,7 @@ function LessonPage() {
   )
 }
 
-function ProtectedLesson() {
-  return (
-    <>
-      <SignedIn><PaidGuard><LessonPage /></PaidGuard></SignedIn>
-      <SignedOut><Navigate to="/sign-in" replace /></SignedOut>
-    </>
-  )
-}
+// ─── Quiz Page ────────────────────────────────────────────────────────────────
 
 function QuizPage() {
   const { sectionId } = useParams<{ sectionId: string }>()
@@ -551,13 +588,15 @@ function QuizPage() {
   const section = COURSE.sections.find((s) => s.id === sectionId)
 
   const [currentIndex, setCurrentIndex] = useState(0)
-  const [answers, setAnswers] = useState<(number | null)[]>(() => quiz ? Array(quiz.questions.length).fill(null) : [])
+  const [answers, setAnswers] = useState<(number | null)[]>(() =>
+    quiz ? Array(quiz.questions.length).fill(null) : []
+  )
 
   if (!quiz || !section) {
     return (
-      <div style={{ padding: '2rem' }}>
+      <div className="quiz-shell">
         <p>Quiz not found.</p>
-        <Link to="/course">← Back to Course</Link>
+        <Link to="/course" className="page-back-link">← Back to Course</Link>
       </div>
     )
   }
@@ -565,38 +604,65 @@ function QuizPage() {
   const question = quiz.questions[currentIndex]
   const selected = answers[currentIndex]
   const isLast = currentIndex === quiz.questions.length - 1
+  const progressPct = Math.round((currentIndex / quiz.questions.length) * 100)
 
   return (
-    <div style={{ padding: '2rem', maxWidth: '640px' }}>
-      <Link to="/course">← Back to Course</Link>
-      <p style={{ margin: '1rem 0 0.25rem', color: '#666', fontSize: '0.9rem' }}>{section.title}</p>
-      <h1 style={{ fontSize: '1.75rem', margin: '0.25rem 0 1rem' }}>Section Quiz</h1>
-      <p style={{ marginBottom: '1rem', fontSize: '0.9rem', color: '#666' }}>
+    <div className="quiz-shell">
+      <Link to="/course" className="page-back-link">← Back to Course</Link>
+
+      <p className="quiz-context">{section.title}</p>
+      <h1 className="quiz-heading">Section Quiz</h1>
+
+      <div className="quiz-progress">
+        <div className="quiz-progress__fill" style={{ width: `${progressPct}%` }} />
+      </div>
+
+      <p className="quiz-counter">
         Question {currentIndex + 1} of {quiz.questions.length}
       </p>
-      <p style={{ fontWeight: 600, marginBottom: '1rem' }}>{question.question}</p>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1.5rem' }}>
+
+      <p className="quiz-question">{question.question}</p>
+
+      <div className="quiz-options">
         {question.options.map((option, i) => (
-          <label key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-            <input
-              type="radio"
-              name={`q-${question.id}`}
-              checked={selected === i}
-              onChange={() => setAnswers((prev) => { const next = [...prev]; next[currentIndex] = i; return next })}
-            />
-            {option}
-          </label>
+          <button
+            key={i}
+            className={`quiz-option${selected === i ? ' quiz-option--selected' : ''}`}
+            onClick={() =>
+              setAnswers((prev) => {
+                const next = [...prev]
+                next[currentIndex] = i
+                return next
+              })
+            }
+          >
+            <span className="quiz-option__dot" />
+            <span className="quiz-option__label">{option}</span>
+          </button>
         ))}
       </div>
+
       <button
+        className="quiz-submit"
         disabled={selected === null}
         onClick={() => {
           if (isLast) {
-            const correct = answers.filter((a, i) => a === quiz.questions[i].correctIndex).length
+            const correct = answers.filter(
+              (a, i) => a === quiz.questions[i].correctIndex
+            ).length
             const total = quiz.questions.length
             const passed = correct / total >= 0.8
             setQuizResult(section.id, passed ? 'passed' : 'failed')
-            navigate('/course', { state: { quizSummary: { correct, total, passed, sectionTitle: section.title } } })
+            navigate('/course', {
+              state: {
+                quizSummary: {
+                  correct,
+                  total,
+                  passed,
+                  sectionTitle: section.title,
+                },
+              },
+            })
           } else {
             setCurrentIndex((i) => i + 1)
           }
@@ -608,14 +674,7 @@ function QuizPage() {
   )
 }
 
-function ProtectedQuiz() {
-  return (
-    <>
-      <SignedIn><PaidGuard><QuizPage /></PaidGuard></SignedIn>
-      <SignedOut><Navigate to="/sign-in" replace /></SignedOut>
-    </>
-  )
-}
+// ─── Final Exam Page ──────────────────────────────────────────────────────────
 
 function FinalExamPage() {
   const { completed, quizResults, finalExamResult, setFinalExamResult } = useCompletion()
@@ -625,52 +684,86 @@ function FinalExamPage() {
   const eligible = allLessonsDone && allQuizzesPassed
 
   const [currentIndex, setCurrentIndex] = useState(0)
-  const [answers, setAnswers] = useState<(number | null)[]>(Array(FINAL_EXAM_QUESTIONS.length).fill(null))
+  const [answers, setAnswers] = useState<(number | null)[]>(
+    Array(FINAL_EXAM_QUESTIONS.length).fill(null)
+  )
   const [showResults, setShowResults] = useState(false)
 
   if (!eligible) {
     return (
-      <div style={{ padding: '2rem' }}>
-        <p>You must complete all lessons and pass all section quizzes before taking the final exam.</p>
-        <Link to="/course">← Back to Course</Link>
+      <div className="exam-shell">
+        <Link to="/course" className="page-back-link">← Back to Course</Link>
+        <div className="info-panel info-panel--notice" style={{ marginTop: 'var(--sp-6)' }}>
+          You must complete all lessons and pass all section quizzes before taking the final exam.
+        </div>
       </div>
     )
   }
 
   if (finalExamResult === 'passed') {
     return (
-      <div style={{ padding: '2rem' }}>
-        <p>Final exam already passed.</p>
-        <div style={{ marginTop: '1rem', display: 'flex', gap: '1rem' }}>
-          <Link to="/certificate">View Certificate</Link>
-          <Link to="/course">Back to Course</Link>
+      <div className="exam-shell">
+        <Link to="/course" className="page-back-link">← Back to Course</Link>
+        <div
+          className="status-bar status-bar--certified"
+          style={{ marginTop: 'var(--sp-6)' }}
+        >
+          <span className="status-label" style={{ color: 'var(--color-gold)' }}>
+            ✓ Final Exam Passed
+          </span>
+          <Link to="/certificate">View Certificate →</Link>
         </div>
       </div>
     )
   }
 
   if (showResults) {
-    const correct = answers.filter((a, i) => a === FINAL_EXAM_QUESTIONS[i].correctIndex).length
+    const correct = answers.filter(
+      (a, i) => a === FINAL_EXAM_QUESTIONS[i].correctIndex
+    ).length
     const total = FINAL_EXAM_QUESTIONS.length
     const passed = correct / total >= 0.8
+
     return (
-      <div style={{ padding: '2rem', maxWidth: '640px' }}>
-        <h1 style={{ fontSize: '1.75rem', margin: '0 0 0.5rem' }}>Final Exam Results</h1>
-        <p style={{ marginBottom: '0.5rem' }}>You scored {correct} out of {total}.</p>
-        <p style={{ fontWeight: 600, color: passed ? 'green' : 'red' }}>
-          {passed ? 'Final exam passed.' : 'Final exam failed.'}
-        </p>
-        <div style={{ marginTop: '1.5rem', display: 'flex', gap: '1rem' }}>
+      <div className="exam-shell">
+        <h1 className="page-title" style={{ marginBottom: 'var(--sp-6)' }}>
+          Final Exam Results
+        </h1>
+        <div className="exam-results-panel">
+          <p className="results-label">Score</p>
+          <p className="results-score">
+            {correct}/{total}
+          </p>
+          <p
+            style={{
+              fontFamily: 'var(--font-ui)',
+              fontWeight: 700,
+              fontSize: '0.8rem',
+              letterSpacing: '0.06em',
+              textTransform: 'uppercase',
+              color: passed ? 'var(--color-success)' : 'var(--color-error)',
+              marginTop: 'var(--sp-3)',
+            }}
+          >
+            {passed ? '✓ Final exam passed.' : '✗ Final exam failed.'}
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: 'var(--sp-4)' }}>
           {!passed && (
-            <button onClick={() => {
-              setAnswers(Array(FINAL_EXAM_QUESTIONS.length).fill(null))
-              setCurrentIndex(0)
-              setShowResults(false)
-            }}>
+            <button
+              className="btn-primary"
+              onClick={() => {
+                setAnswers(Array(FINAL_EXAM_QUESTIONS.length).fill(null))
+                setCurrentIndex(0)
+                setShowResults(false)
+              }}
+            >
               Retry Exam
             </button>
           )}
-          <Link to="/course">Back to Course</Link>
+          <Link to="/course" className="btn-secondary">
+            Back to Course
+          </Link>
         </div>
       </div>
     )
@@ -679,41 +772,67 @@ function FinalExamPage() {
   const question = FINAL_EXAM_QUESTIONS[currentIndex]
   const selected = answers[currentIndex]
   const isLast = currentIndex === FINAL_EXAM_QUESTIONS.length - 1
+  const progressPct = Math.round((currentIndex / FINAL_EXAM_QUESTIONS.length) * 100)
 
   return (
-    <div style={{ padding: '2rem', maxWidth: '640px' }}>
-      <Link to="/course">← Back to Course</Link>
-      <h1 style={{ fontSize: '1.75rem', margin: '0.75rem 0 1rem' }}>Final Exam</h1>
-      <p style={{ marginBottom: '1rem', fontSize: '0.9rem', color: '#666' }}>
+    <div className="exam-shell">
+      <Link to="/course" className="page-back-link">← Back to Course</Link>
+      <h1 className="quiz-heading">Final Exam</h1>
+
+      <div className="quiz-progress">
+        <div className="quiz-progress__fill" style={{ width: `${progressPct}%` }} />
+      </div>
+
+      <p className="quiz-counter">
         Question {currentIndex + 1} of {FINAL_EXAM_QUESTIONS.length}
       </p>
-      <p style={{ fontWeight: 600, marginBottom: '1rem' }}>{question.question}</p>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1.5rem' }}>
+
+      <p className="quiz-question">{question.question}</p>
+
+      <div className="quiz-options">
         {question.options.map((option, i) => (
-          <label key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-            <input
-              type="radio"
-              name={`fe-${question.id}`}
-              checked={selected === i}
-              onChange={() => setAnswers((prev) => { const next = [...prev]; next[currentIndex] = i; return next })}
-            />
-            {option}
-          </label>
+          <button
+            key={i}
+            className={`quiz-option${selected === i ? ' quiz-option--selected' : ''}`}
+            onClick={() =>
+              setAnswers((prev) => {
+                const next = [...prev]
+                next[currentIndex] = i
+                return next
+              })
+            }
+          >
+            <span className="quiz-option__dot" />
+            <span className="quiz-option__label">{option}</span>
+          </button>
         ))}
       </div>
+
       <button
+        className="quiz-submit"
         disabled={selected === null}
         onClick={() => {
           if (isLast) {
-            const correct = answers.filter((a, i) => a === FINAL_EXAM_QUESTIONS[i].correctIndex).length
+            const correct = answers.filter(
+              (a, i) => a === FINAL_EXAM_QUESTIONS[i].correctIndex
+            ).length
             const passed = correct / FINAL_EXAM_QUESTIONS.length >= 0.8
             setFinalExamResult(passed ? 'passed' : 'failed')
             if (passed) {
               const email = user?.primaryEmailAddress?.emailAddress
               if (email) {
-                const records: { email: string; courseName: string; completionDate: string }[] =
-                  JSON.parse(localStorage.getItem('wci_certifications') || '[]')
-                const date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+                const records: {
+                  email: string
+                  courseName: string
+                  completionDate: string
+                }[] = JSON.parse(
+                  localStorage.getItem('wci_certifications') || '[]'
+                )
+                const date = new Date().toLocaleDateString('en-US', {
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric',
+                })
                 const idx = records.findIndex((r) => r.email === email)
                 const record = { email, courseName: COURSE.title, completionDate: date }
                 if (idx >= 0) records[idx] = record
@@ -733,111 +852,234 @@ function FinalExamPage() {
   )
 }
 
+// ─── Certificate Page ─────────────────────────────────────────────────────────
+
 function CertificatePage() {
   const { finalExamResult } = useCompletion()
   const { user } = useUser()
 
-  if (finalExamResult !== 'passed') {
-    return <Navigate to="/course" replace />
-  }
+  if (finalExamResult !== 'passed') return <Navigate to="/course" replace />
 
   const email = user?.primaryEmailAddress?.emailAddress ?? 'the participant'
-  const date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+  const date = new Date().toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  })
 
   return (
-    <div style={{ padding: '3rem 2rem', maxWidth: '680px', margin: '0 auto', textAlign: 'center' }}>
-      <div className="no-print" style={{ marginBottom: '1.5rem', display: 'flex', gap: '1rem', justifyContent: 'center' }}>
-        <Link to="/course">← Back to Course</Link>
-        <button onClick={() => window.print()}>Download PDF</button>
+    <div className="certificate-shell">
+      <div className="no-print certificate-actions">
+        <Link to="/course" className="btn-secondary">← Back to Course</Link>
+        <button className="btn-primary" onClick={() => window.print()}>
+          Download PDF
+        </button>
       </div>
 
-      <div className="certificate-body" style={{
-        border: '2px solid var(--border)',
-        borderRadius: '6px',
-        padding: '3.5rem 3rem',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        gap: '1.5rem',
-      }}>
-        <p style={{ margin: 0, fontSize: '0.85rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: '#888' }}>
-          Workplace Compliance Institute
-        </p>
+      <div className="certificate-document">
+        <p className="certificate-institute">Workplace Compliance Institute</p>
 
-        <h1 style={{ fontSize: '2rem', margin: 0, letterSpacing: '-0.5px' }}>Certificate of Completion</h1>
+        <h1 className="certificate-heading">Certificate of Completion</h1>
 
-        <p style={{ margin: 0, color: '#888', fontSize: '0.9rem' }}>This certifies that</p>
+        <p className="certificate-presents">This certifies that</p>
 
-        <p style={{ margin: 0, fontSize: '1.4rem', fontWeight: 600 }}>{email}</p>
+        <p className="certificate-name">{email}</p>
 
-        <p style={{ margin: 0, lineHeight: '1.7', maxWidth: '440px' }}>
+        <p
+          style={{
+            fontFamily: 'var(--font-ui)',
+            fontSize: '0.875rem',
+            color: 'var(--text-muted)',
+          }}
+        >
           has successfully completed the course
         </p>
 
-        <p style={{ margin: 0, fontSize: '1.15rem', fontWeight: 600 }}>EEO Investigator Certification</p>
+        <p className="certificate-course">EEO Investigator Certification</p>
 
-        <div style={{ width: '4rem', borderTop: '1px solid var(--border)' }} />
+        <hr className="certificate-divider" />
 
-        <p style={{ margin: 0, color: '#888', fontSize: '0.9rem' }}>Issued {date}</p>
+        <p className="certificate-date">Issued {date}</p>
       </div>
     </div>
   )
 }
 
+// ─── Verify Page ──────────────────────────────────────────────────────────────
+
 function VerifyPage() {
   const [email, setEmail] = useState('')
-  const [result, setResult] = useState<{ email: string; courseName: string; completionDate: string } | 'not-found' | null>(null)
+  const [result, setResult] = useState<
+    { email: string; courseName: string; completionDate: string } | 'not-found' | null
+  >(null)
 
   function handleSubmit(e: { preventDefault(): void }) {
     e.preventDefault()
-    const records: { email: string; courseName: string; completionDate: string }[] =
-      JSON.parse(localStorage.getItem('wci_certifications') || '[]')
+    const records: { email: string; courseName: string; completionDate: string }[] = JSON.parse(
+      localStorage.getItem('wci_certifications') || '[]'
+    )
     const found = records.find((r) => r.email.toLowerCase() === email.toLowerCase())
     setResult(found ?? 'not-found')
   }
 
   return (
-    <div style={{ padding: '3rem 2rem', maxWidth: '500px', margin: '0 auto' }}>
-      <Link to="/">← Back to Home</Link>
-      <h1 style={{ fontSize: '1.75rem', margin: '1rem 0 0.5rem' }}>Verify Certificate</h1>
-      <p style={{ color: '#666', marginBottom: '1.5rem' }}>Enter an email address to check certification status.</p>
+    <div className="verify-shell">
+      <Link to="/" className="page-back-link">← Back to Home</Link>
 
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1.5rem' }}>
+      <div className="verify-hero">
+        <h1>Verify Certificate</h1>
+        <p>Enter an email address to confirm certification status.</p>
+      </div>
+
+      <form onSubmit={handleSubmit} className="verify-form">
         <input
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder="Email address"
           required
-          style={{ padding: '0.5rem 0.75rem', border: '1px solid var(--border)', borderRadius: '4px', fontSize: '1rem', background: 'var(--bg)', color: 'var(--text-h)' }}
+          className="verify-input"
         />
-        <button type="submit" style={{ padding: '0.5rem 1rem', alignSelf: 'flex-start' }}>
+        <button type="submit" className="verify-submit">
           Check Status
         </button>
       </form>
 
       {result === 'not-found' && (
-        <div style={{ padding: '1rem', border: '1px solid var(--border)', borderRadius: '4px' }}>
-          <p style={{ margin: 0, color: 'red' }}>No certification found for this email.</p>
+        <div className="verify-result verify-result--invalid">
+          <span className="verify-badge verify-badge--invalid">✗ Not Found</span>
+          <p
+            style={{
+              fontFamily: 'var(--font-ui)',
+              fontSize: '0.875rem',
+              color: 'var(--color-error)',
+            }}
+          >
+            No certification found for this email address.
+          </p>
         </div>
       )}
 
       {result && result !== 'not-found' && (
-        <div style={{ padding: '1rem', border: '1px solid var(--border)', borderRadius: '4px', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-          <p style={{ margin: 0, fontWeight: 600, color: 'green' }}>✓ Verified</p>
-          <p style={{ margin: 0 }}>Course: {result.courseName}</p>
-          <p style={{ margin: 0 }}>Status: Certified</p>
-          <p style={{ margin: 0 }}>Completion date: {result.completionDate}</p>
+        <div className="verify-result verify-result--valid">
+          <span className="verify-badge verify-badge--valid">✓ Verified</span>
+          <table className="verify-detail-table">
+            <tbody>
+              <tr>
+                <td>Course</td>
+                <td>{result.courseName}</td>
+              </tr>
+              <tr>
+                <td>Status</td>
+                <td style={{ color: 'var(--color-success)', fontWeight: 600 }}>Certified</td>
+              </tr>
+              <tr>
+                <td>Completion Date</td>
+                <td>{result.completionDate}</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       )}
     </div>
   )
 }
 
-function ProtectedCertificate() {
+// ─── Checkout Pages ───────────────────────────────────────────────────────────
+
+function CheckoutSuccessPage() {
+  const { refetchPaidStatus, paid, paidLoading } = useCompletion()
+  const { isLoaded, isSignedIn } = useUser()
+
+  // Once Clerk resolves, refetch paid status from the server so the gate
+  // reflects the real post-payment state without writing anything locally.
+  useEffect(() => {
+    if (isLoaded && isSignedIn) {
+      refetchPaidStatus()
+    }
+    // refetchPaidStatus is intentionally excluded: we only want this to fire
+    // when Clerk finishes loading, not on every context re-render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoaded, isSignedIn])
+
+  if (paidLoading) {
+    return (
+      <div className="checkout-shell">
+        <h1>Verifying payment…</h1>
+        <p>Please wait while we confirm your purchase.</p>
+      </div>
+    )
+  }
+
+  if (!paid) {
+    return (
+      <div className="checkout-shell">
+        <h1>Payment Not Verified</h1>
+        <p>We couldn't confirm a completed payment for this account. If you believe this is an error, please contact support.</p>
+        <Link to="/" className="btn-secondary">Return Home →</Link>
+      </div>
+    )
+  }
+
+  return (
+    <div className="checkout-shell">
+      <h1>Payment Successful</h1>
+      <p>Your certification purchase was confirmed. You now have full access to the course.</p>
+      <Link to="/dashboard" className="btn-primary">Continue to Dashboard →</Link>
+    </div>
+  )
+}
+
+function CheckoutCancelPage() {
+  return (
+    <div className="checkout-shell">
+      <h1>Checkout Canceled</h1>
+      <p>Your purchase was not completed. You can try again whenever you're ready.</p>
+      <Link to="/" className="btn-secondary">Return Home →</Link>
+    </div>
+  )
+}
+
+// ─── Guards ───────────────────────────────────────────────────────────────────
+
+function PaidGuard({ children }: { children: React.ReactNode }) {
+  const { paid, paidLoading } = useCompletion()
+  if (paidLoading) return null
+  if (!paid) return <Navigate to="/" replace />
+  return <>{children}</>
+}
+
+function ProtectedDashboard() {
   return (
     <>
-      <SignedIn><PaidGuard><CertificatePage /></PaidGuard></SignedIn>
+      <SignedIn><DashboardPage /></SignedIn>
+      <SignedOut><Navigate to="/sign-in" replace /></SignedOut>
+    </>
+  )
+}
+
+function ProtectedCourse() {
+  return (
+    <>
+      <SignedIn><PaidGuard><CoursePage /></PaidGuard></SignedIn>
+      <SignedOut><Navigate to="/sign-in" replace /></SignedOut>
+    </>
+  )
+}
+
+function ProtectedLesson() {
+  return (
+    <>
+      <SignedIn><PaidGuard><LessonPage /></PaidGuard></SignedIn>
+      <SignedOut><Navigate to="/sign-in" replace /></SignedOut>
+    </>
+  )
+}
+
+function ProtectedQuiz() {
+  return (
+    <>
+      <SignedIn><PaidGuard><QuizPage /></PaidGuard></SignedIn>
       <SignedOut><Navigate to="/sign-in" replace /></SignedOut>
     </>
   )
@@ -852,128 +1094,130 @@ function ProtectedFinalExam() {
   )
 }
 
-function CheckoutSuccessPage() {
-  const { setPaidFlag } = useCompletion()
-
-  useEffect(() => {
-    setPaidFlag()
-  }, [])
-
-  return (
-    <div style={{ padding: '3rem 2rem', maxWidth: '500px', margin: '0 auto', textAlign: 'center' }}>
-      <h1 style={{ fontSize: '1.75rem', margin: '0 0 1rem' }}>Payment Successful</h1>
-      <p style={{ color: '#666', marginBottom: '2rem' }}>Your certification purchase was successful.</p>
-      <Link to="/dashboard">Continue to Dashboard →</Link>
-    </div>
-  )
-}
-
-function CheckoutCancelPage() {
-  return (
-    <div style={{ padding: '3rem 2rem', maxWidth: '500px', margin: '0 auto', textAlign: 'center' }}>
-      <h1 style={{ fontSize: '1.75rem', margin: '0 0 1rem' }}>Checkout Canceled</h1>
-      <p style={{ color: '#666', marginBottom: '2rem' }}>Your purchase was not completed.</p>
-      <Link to="/">Return Home →</Link>
-    </div>
-  )
-}
-
-function PaidGuard({ children }: { children: React.ReactNode }) {
-  const { paid } = useCompletion()
-  if (!paid) return <Navigate to="/" replace />
-  return <>{children}</>
-}
-
-function ProtectedCourse() {
+function ProtectedCertificate() {
   return (
     <>
-      <SignedIn><PaidGuard><CoursePage /></PaidGuard></SignedIn>
+      <SignedIn><PaidGuard><CertificatePage /></PaidGuard></SignedIn>
       <SignedOut><Navigate to="/sign-in" replace /></SignedOut>
     </>
   )
 }
 
-function ProtectedDashboard() {
-  return (
-    <>
-      <SignedIn>
-        <DashboardPage />
-      </SignedIn>
-      <SignedOut>
-        <Navigate to="/sign-in" replace />
-      </SignedOut>
-    </>
-  )
-}
+// ─── Root ─────────────────────────────────────────────────────────────────────
 
 export default function App() {
-  const [completed, setCompleted] = useState<Set<string>>(() => {
-    try {
-      const stored = localStorage.getItem('wci_completed_lessons')
-      return stored ? new Set(JSON.parse(stored)) : new Set()
-    } catch {
-      return new Set()
-    }
-  })
-  const toggle = (id: string) => setCompleted((prev) => {
-    const next = new Set(prev)
-    next.has(id) ? next.delete(id) : next.add(id)
-    localStorage.setItem('wci_completed_lessons', JSON.stringify([...next]))
-    return next
-  })
+  const { user } = useUser()
+  const userId = user?.id ?? null
 
-  const [quizResults, setQuizResults] = useState<Record<string, QuizResult>>(() => {
-    try {
-      const stored = localStorage.getItem('wci_quiz_results')
-      return stored ? JSON.parse(stored) : {}
-    } catch {
-      return {}
+  // State starts empty; useEffect below loads the correct user's data once
+  // Clerk resolves the session and whenever the active user changes.
+  const [completed, setCompleted] = useState<Set<string>>(new Set())
+  const [quizResults, setQuizResults] = useState<Record<string, QuizResult>>({})
+  const [finalExamResult, setFinalExamResultState] = useState<QuizResult | null>(null)
+  const [paid, setPaidState] = useState<boolean>(false)
+  const [paidLoading, setPaidLoading] = useState<boolean>(true)
+
+  useEffect(() => {
+    if (!userId) {
+      // No authenticated user — reset everything to clean defaults.
+      setCompleted(new Set())
+      setQuizResults({})
+      setFinalExamResultState(null)
+      setPaidState(false)
+      setPaidLoading(false)
+      return
     }
-  })
-  const setQuizResult = (sectionId: string, result: QuizResult) =>
-    setQuizResults((prev) => {
-      const next = { ...prev, [sectionId]: result }
-      localStorage.setItem('wci_quiz_results', JSON.stringify(next))
+    try {
+      const s = localStorage.getItem(`wci_completed_lessons_${userId}`)
+      setCompleted(s ? new Set(JSON.parse(s)) : new Set())
+    } catch { setCompleted(new Set()) }
+
+    try {
+      const s = localStorage.getItem(`wci_quiz_results_${userId}`)
+      setQuizResults(s ? JSON.parse(s) : {})
+    } catch { setQuizResults({}) }
+
+    const exam = localStorage.getItem(`wci_final_exam_result_${userId}`)
+    setFinalExamResultState(exam === 'passed' || exam === 'failed' ? exam : null)
+
+    // Fetch paid status from the server — this is the authoritative source.
+    const controller = new AbortController()
+    loadPaidStatus(userId, controller.signal)
+    return () => { controller.abort() }
+  }, [userId])
+
+  const loadPaidStatus = (uid: string, signal?: AbortSignal) => {
+    const base = import.meta.env.VITE_API_URL ?? ''
+    setPaidLoading(true)
+    fetch(`${base}/payment-status?clerkUserId=${uid}`, { signal })
+      .then((res) => { if (!res.ok) throw new Error(`${res.status}`); return res.json() })
+      .then((data) => { setPaidState(data.paid === true); setPaidLoading(false) })
+      .catch((err) => {
+        if (err.name === 'AbortError') return
+        // Network error: fall back to localStorage so the app stays usable offline
+        setPaidState(localStorage.getItem(`wci_paid_user_${uid}`) === 'true')
+        setPaidLoading(false)
+      })
+  }
+
+  const toggle = (id: string) => {
+    if (!userId) return
+    setCompleted((prev) => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      localStorage.setItem(`wci_completed_lessons_${userId}`, JSON.stringify([...next]))
       return next
     })
+  }
 
-  const [finalExamResult, setFinalExamResultState] = useState<QuizResult | null>(() => {
-    const stored = localStorage.getItem('wci_final_exam_result')
-    return stored === 'passed' || stored === 'failed' ? stored : null
-  })
+  const setQuizResult = (sectionId: string, result: QuizResult) => {
+    if (!userId) return
+    setQuizResults((prev) => {
+      const next = { ...prev, [sectionId]: result }
+      localStorage.setItem(`wci_quiz_results_${userId}`, JSON.stringify(next))
+      return next
+    })
+  }
+
   const setFinalExamResult = (result: QuizResult) => {
-    localStorage.setItem('wci_final_exam_result', result)
+    if (!userId) return
+    localStorage.setItem(`wci_final_exam_result_${userId}`, result)
     setFinalExamResultState(result)
   }
 
-  const [paid, setPaidState] = useState<boolean>(() => localStorage.getItem('wci_paid_user') === 'true')
-  const setPaidFlag = () => {
-    localStorage.setItem('wci_paid_user', 'true')
-    setPaidState(true)
+  const refetchPaidStatus = () => {
+    if (!userId) return
+    loadPaidStatus(userId)
   }
 
   return (
-    <CompletionContext.Provider value={{ completed, toggle, quizResults, setQuizResult, finalExamResult, setFinalExamResult, paid, setPaidFlag }}>
-    <Routes>
-      <Route path="/" element={<HomePage />} />
-      <Route
-        path="/sign-in/*"
-        element={<SignIn routing="path" path="/sign-in" />}
-      />
-      <Route
-        path="/sign-up/*"
-        element={<SignUp routing="path" path="/sign-up" />}
-      />
-      <Route path="/dashboard" element={<ProtectedDashboard />} />
-      <Route path="/course" element={<ProtectedCourse />} />
-      <Route path="/lesson/:id" element={<ProtectedLesson />} />
-      <Route path="/quiz/:sectionId" element={<ProtectedQuiz />} />
-      <Route path="/final-exam" element={<ProtectedFinalExam />} />
-      <Route path="/certificate" element={<ProtectedCertificate />} />
-      <Route path="/verify" element={<VerifyPage />} />
-      <Route path="/checkout-success" element={<CheckoutSuccessPage />} />
-      <Route path="/checkout-cancel" element={<CheckoutCancelPage />} />
-    </Routes>
+    <CompletionContext.Provider
+      value={{
+        completed,
+        toggle,
+        quizResults,
+        setQuizResult,
+        finalExamResult,
+        setFinalExamResult,
+        paid,
+        paidLoading,
+        refetchPaidStatus,
+      }}
+    >
+      <Routes>
+        <Route path="/" element={<HomePage />} />
+        <Route path="/sign-in/*" element={<SignIn routing="path" path="/sign-in" />} />
+        <Route path="/sign-up/*" element={<SignUp routing="path" path="/sign-up" />} />
+        <Route path="/dashboard" element={<ProtectedDashboard />} />
+        <Route path="/course" element={<ProtectedCourse />} />
+        <Route path="/lesson/:id" element={<ProtectedLesson />} />
+        <Route path="/quiz/:sectionId" element={<ProtectedQuiz />} />
+        <Route path="/final-exam" element={<ProtectedFinalExam />} />
+        <Route path="/certificate" element={<ProtectedCertificate />} />
+        <Route path="/verify" element={<VerifyPage />} />
+        <Route path="/checkout-success" element={<CheckoutSuccessPage />} />
+        <Route path="/checkout-cancel" element={<CheckoutCancelPage />} />
+      </Routes>
     </CompletionContext.Provider>
   )
 }
