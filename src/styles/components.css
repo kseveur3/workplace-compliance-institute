@@ -1,0 +1,258 @@
+/* ============================================================
+   Phase 2 — Shared UI Surface Styles
+   The Institute Standard
+   ============================================================
+   Strategy: global element selectors only.
+   Inline styles in App.tsx win on individual properties they set,
+   so this file is additive — it applies to whatever is NOT
+   already overridden inline.
+   ============================================================ */
+
+
+/* ──────────────────────────────────────────────────────────
+   1. BUTTONS
+
+   Targets native <button> elements.
+   Buttons with inline background/color (homepage CTAs) will
+   keep their inline values. Unstyled action buttons (quiz
+   submit, exam submit, lesson toggle, download PDF, retry)
+   will receive the full institutional treatment.
+   ────────────────────────────────────────────────────────── */
+
+button {
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  letter-spacing: var(--tracking-wide);
+  padding: var(--space-3) var(--space-5);
+  background-color: var(--color-navy);
+  color: var(--color-text-inverse);
+  border: 1px solid var(--color-navy-dark);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  line-height: var(--leading-tight);
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+button:hover:not(:disabled) {
+  background-color: var(--color-navy-mid);
+  border-color: var(--color-navy-mid);
+  box-shadow: var(--shadow-xs);
+}
+
+button:focus-visible {
+  outline: 2px solid var(--color-gold);
+  outline-offset: 2px;
+  box-shadow: none;
+}
+
+button:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* Secondary / ghost pattern — opt-in utility class */
+.btn-ghost {
+  background-color: var(--color-white) !important;
+  color: var(--color-navy) !important;
+  border: 1px solid var(--color-border-dark) !important;
+}
+
+.btn-ghost:hover:not(:disabled) {
+  background-color: var(--color-cream) !important;
+  border-color: var(--color-navy) !important;
+  box-shadow: var(--shadow-xs);
+}
+
+
+/* ──────────────────────────────────────────────────────────
+   2. FORM CONTROLS
+
+   Applies to text-type inputs and selects. Radio/checkbox
+   are excluded — they have their own treatment below.
+   The VerifyPage input has some inline styles; this layer
+   adds font-family and focus state which inline does not set.
+   ────────────────────────────────────────────────────────── */
+
+input:not([type="radio"]):not([type="checkbox"]):not([type="submit"]),
+select,
+textarea {
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  color: var(--color-text-primary);
+  background-color: var(--color-white);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+  line-height: var(--leading-normal);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+input:not([type="radio"]):not([type="checkbox"]):not([type="submit"]):focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--color-navy);
+  box-shadow: 0 0 0 3px rgba(27, 42, 74, 0.10);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--color-text-muted);
+  font-style: normal;
+}
+
+select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%234A4A4A' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right var(--space-3) center;
+  padding-right: var(--space-8);
+  cursor: pointer;
+}
+
+
+/* ──────────────────────────────────────────────────────────
+   3. LABELS
+   ────────────────────────────────────────────────────────── */
+
+label {
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  line-height: var(--leading-snug);
+}
+
+
+/* ──────────────────────────────────────────────────────────
+   4. RADIO OPTION ROWS (quiz + exam)
+
+   Quiz/exam labels have inline display:flex, alignItems, gap,
+   and cursor. This layer adds the visual card treatment on top.
+   Uses :has() — supported in all modern browsers.
+   ────────────────────────────────────────────────────────── */
+
+label:has(input[type="radio"]) {
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border-dark);
+  border-radius: var(--radius-md);
+  background-color: var(--color-white);
+  color: var(--color-text-primary);
+  font-size: var(--text-base);
+  font-weight: 400;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+  user-select: none;
+}
+
+label:has(input[type="radio"]):hover {
+  border-color: var(--color-border-dark);
+  background-color: var(--color-gold-pale);
+}
+
+label:has(input[type="radio"]):has(:checked) {
+  border-color: var(--color-navy);
+  background-color: var(--color-info-bg);
+  color: var(--color-navy);
+}
+
+input[type="radio"] {
+  accent-color: var(--color-navy);
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+
+/* ──────────────────────────────────────────────────────────
+   5. PANEL / CARD UTILITY CLASSES
+
+   Opt-in utility classes. Not applied to existing markup yet —
+   available for Phase 3 page-level work.
+   ────────────────────────────────────────────────────────── */
+
+.panel {
+  background-color: var(--color-white);
+  border: 1px solid var(--color-border-dark);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5) var(--space-6);
+  box-shadow: var(--shadow-sm);
+}
+
+.panel--warm {
+  background-color: var(--color-cream);
+  border-color: var(--color-border-dark);
+}
+
+.panel--navy {
+  background-color: var(--color-navy);
+  border-color: var(--color-navy-dark);
+  color: var(--color-text-inverse);
+}
+
+.panel--navy h1,
+.panel--navy h2,
+.panel--navy h3,
+.panel--navy p {
+  color: var(--color-text-inverse);
+}
+
+
+/* ──────────────────────────────────────────────────────────
+   6. FOCUS RINGS — anchors
+   ────────────────────────────────────────────────────────── */
+
+a:focus-visible {
+  outline: 2px solid var(--color-gold);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+}
+
+
+/* ──────────────────────────────────────────────────────────
+   7. CONTENT RHYTHM HELPERS
+
+   Only for vertical spacing on structural elements.
+   Does NOT change layout or component spacing.
+   ────────────────────────────────────────────────────────── */
+
+/* Tighten list readability */
+ul, ol {
+  padding-left: var(--space-5);
+}
+
+li + li {
+  margin-top: var(--space-1);
+}
+
+/* Horizontal rule */
+hr {
+  border: none;
+  border-top: 1px solid var(--color-border);
+  margin: var(--space-6) 0;
+}
+
+
+/* ──────────────────────────────────────────────────────────
+   8. PRINT — preserve certificate styles
+   ────────────────────────────────────────────────────────── */
+
+@media print {
+  button,
+  .btn-ghost {
+    box-shadow: none !important;
+  }
+}

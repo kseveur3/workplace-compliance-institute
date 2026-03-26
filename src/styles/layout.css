@@ -1,0 +1,525 @@
+/* ============================================================
+   Phase 3–6 — Page Structure, Visual Hierarchy & Refinement
+   The Institute Standard
+
+   Loaded after index.css. Class selectors here override
+   index.css element selectors by specificity, no !important
+   needed. Logic-tied inline color values in App.tsx are
+   separately updated to use token vars.
+   ============================================================ */
+
+
+/* ──────────────────────────────────────────────────────────
+   ROOT COLUMN — align border color to token system
+   index.css sets border-inline: 1px solid var(--border) where
+   --border is the old scaffold token (#e5e4e7). This overrides
+   it to use the institute's warmer --color-border token.
+   ────────────────────────────────────────────────────────── */
+
+#root {
+  border-inline: none;
+}
+
+
+/* ──────────────────────────────────────────────────────────
+   PAGE SHELL
+   Replaces ad-hoc padding / maxWidth inline styles.
+   Sets text-align: left to override #root { text-align: center }.
+   ────────────────────────────────────────────────────────── */
+
+.page-shell {
+  text-align: left;
+  padding: var(--space-10) var(--space-8);
+  max-width: var(--container-md);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+@media (max-width: 680px) {
+  .page-shell {
+    padding: var(--space-6) var(--space-5);
+  }
+}
+
+
+/* ──────────────────────────────────────────────────────────
+   BREADCRUMB / BACK LINK
+   ────────────────────────────────────────────────────────── */
+
+.page-back-link {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  text-decoration: none;
+  letter-spacing: var(--tracking-wide);
+  transition: color 0.15s ease;
+  margin-bottom: var(--space-6);
+}
+
+.page-back-link:hover {
+  color: var(--color-navy);
+  text-decoration: none;
+}
+
+
+/* ──────────────────────────────────────────────────────────
+   PAGE HEADER REGION
+   ────────────────────────────────────────────────────────── */
+
+.page-header {
+  margin-bottom: var(--space-8);
+  padding-bottom: var(--space-6);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.page-title {
+  /* class beats index.css h1 element selector */
+  font-family: var(--font-display);
+  font-size: var(--text-3xl);
+  font-weight: 600;
+  color: var(--color-navy);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
+  margin: 0 0 var(--space-2);
+}
+
+.page-subtitle {
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  letter-spacing: var(--tracking-wide);
+  margin: 0;
+}
+
+
+/* ──────────────────────────────────────────────────────────
+   DASHBOARD — header, account, actions
+   ────────────────────────────────────────────────────────── */
+
+.dash-header {
+  padding-bottom: var(--space-8);
+  padding-top: var(--space-4);
+  margin-bottom: var(--space-8);
+  border-top: 3px solid var(--color-teal);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.dash-title {
+  font-family: var(--font-display);
+  font-size: var(--text-4xl);
+  font-weight: 600;
+  color: var(--color-navy);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
+  margin: 0 0 var(--space-2);
+}
+
+.dash-meta {
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  letter-spacing: var(--tracking-wide);
+  margin: 0;
+}
+
+
+/* ──────────────────────────────────────────────────────────
+   ACTION ROW
+   ────────────────────────────────────────────────────────── */
+
+.action-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+
+/* ──────────────────────────────────────────────────────────
+   LINK AS BUTTON
+   For <Link> / <a> elements that act as primary actions.
+   ────────────────────────────────────────────────────────── */
+
+.link-btn {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  letter-spacing: var(--tracking-wide);
+  padding: var(--space-3) var(--space-5);
+  background-color: var(--color-navy);
+  color: var(--color-text-inverse);
+  border: 1px solid var(--color-navy-dark);
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  line-height: var(--leading-tight);
+  cursor: pointer;
+  transition: background-color 0.15s ease, box-shadow 0.15s ease;
+  white-space: nowrap;
+}
+
+.link-btn:hover {
+  background-color: var(--color-navy-mid);
+  color: var(--color-text-inverse);
+  text-decoration: none;
+  box-shadow: var(--shadow-xs);
+}
+
+.link-btn:focus-visible {
+  outline: 2px solid var(--color-gold);
+  outline-offset: 2px;
+}
+
+
+/* ──────────────────────────────────────────────────────────
+   INFO PANELS
+   Replaces: border / padding / borderRadius / marginBottom
+   inline style patterns on requirements box, quiz summary,
+   and result notices.
+   ────────────────────────────────────────────────────────── */
+
+.info-panel {
+  background-color: var(--color-white);
+  border: 1px solid var(--color-border-dark);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5) var(--space-6);
+  margin-bottom: var(--space-5);
+  box-shadow: var(--shadow-sm);
+}
+
+.info-panel__title {
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-widest);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  margin: 0 0 var(--space-4);
+}
+
+/* Warm variant — cream background for featured/summary panels */
+.info-panel--warm {
+  background-color: var(--color-cream);
+}
+
+/* Featured variant — dominant surface treatment for primary dashboard panel.
+   Increases internal padding and shadow so the panel reads as the focal element
+   of the page, not just another bordered box. */
+.info-panel--featured {
+  padding: var(--space-6) var(--space-8);
+  box-shadow: var(--shadow-md);
+  border-left: 3px solid var(--color-teal);
+}
+
+/* Quiz result / feedback notice */
+.info-panel--notice {
+  background-color: var(--color-gold-pale);
+  border-color: var(--color-gold-light);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  color: var(--color-text-primary);
+}
+
+/* Requirement checklist inside an info-panel */
+.req-list {
+  margin: 0;
+  padding-left: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  list-style: none;
+}
+
+.req-list li {
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.req-list li::before {
+  content: '—';
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+  font-size: var(--text-xs);
+}
+
+
+/* ──────────────────────────────────────────────────────────
+   STATUS BAR
+   Certification eligibility / certified state row.
+   ────────────────────────────────────────────────────────── */
+
+.status-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  padding: var(--space-4) var(--space-6);
+  border: 1px solid var(--color-border-dark);
+  border-radius: var(--radius-lg);
+  margin-bottom: var(--space-6);
+  background-color: var(--color-cream);
+  box-shadow: var(--shadow-sm);
+  font-family: var(--font-ui);
+}
+
+/* Certified state — gold treatment signals premium certification/distinction */
+.status-bar--certified {
+  background-color: var(--color-gold-pale);
+  border-color: var(--color-gold-light);
+  border-left: 3px solid var(--color-gold);
+}
+
+.status-bar .status-label {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  letter-spacing: var(--tracking-wide);
+}
+
+
+/* ──────────────────────────────────────────────────────────
+   COURSE SECTION BLOCKS
+   ────────────────────────────────────────────────────────── */
+
+/* Asymmetric padding: more space above the section boundary signals "new block starts here."
+   More top padding than bottom creates visual rhythm and prevents sections blending together. */
+.section-block {
+  padding: var(--space-8) 0 var(--space-6);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.section-block:last-of-type {
+  border-bottom: none;
+}
+
+/* Section h2 — class compound selector beats index.css h2 element selector.
+   font-family must be set here explicitly: index.css h2 { font-family: var(--heading) }
+   (system-ui) loads after global.css h2 { font-family: var(--font-display) } and wins
+   on the element selector. This compound selector restores Playfair Display. */
+.section-block h2 {
+  font-family: var(--font-display);
+  font-size: var(--text-2xl);
+  color: var(--color-navy);
+  font-weight: 600;
+  letter-spacing: var(--tracking-tight);
+  margin: 0 0 var(--space-5);
+}
+
+
+/* ──────────────────────────────────────────────────────────
+   LESSON LIST
+   ────────────────────────────────────────────────────────── */
+
+.lesson-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+/* Secondary color lets section h2 (Playfair, text-2xl, navy) dominate.
+   Lesson links are structure, not primary content, at this zoom level. */
+.lesson-list a {
+  display: flex;
+  align-items: center;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.lesson-list a:hover {
+  background-color: var(--color-gold-pale);
+  color: var(--color-navy);
+  text-decoration: none;
+}
+
+
+/* ──────────────────────────────────────────────────────────
+   QUIZ ROW (per-section quiz link + status)
+   ────────────────────────────────────────────────────────── */
+
+/* More top padding increases the visual gap between lesson list and the quiz action.
+   Signals: "lesson list ends here, now take action." */
+.quiz-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border-dark);
+}
+
+/* Explicit DM Sans + weight 500 makes "Start Quiz" read as an intentional action link,
+   not body copy inheriting from the page font stack. */
+.quiz-row a {
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  letter-spacing: var(--tracking-wide);
+}
+
+.quiz-status {
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+}
+
+
+/* ──────────────────────────────────────────────────────────
+   DASHBOARD — course summary panel
+   ────────────────────────────────────────────────────────── */
+
+.dash-course-desc {
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  line-height: var(--leading-normal);
+  margin: 0 0 var(--space-4);
+}
+
+.dash-course-progress {
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  letter-spacing: var(--tracking-wide);
+  border-top: 1px solid var(--color-border-dark);
+  padding-top: var(--space-3);
+  margin: 0;
+}
+
+
+/* ──────────────────────────────────────────────────────────
+   LESSON PAGE — header block
+   ────────────────────────────────────────────────────────── */
+
+.lesson-header {
+  margin-bottom: var(--space-8);
+  padding-bottom: var(--space-6);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.lesson-section-label {
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-widest);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  margin: 0 0 var(--space-2);
+}
+
+/* Fixes index.css h1 element-selector override (system-ui, weight 500, #08060d) */
+.lesson-title {
+  font-family: var(--font-display);
+  font-size: var(--text-3xl);
+  font-weight: 600;
+  color: var(--color-navy);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
+  margin: 0 0 var(--space-2);
+}
+
+.lesson-meta {
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+
+/* ──────────────────────────────────────────────────────────
+   LESSON PAGE — body and audio placeholder
+   ────────────────────────────────────────────────────────── */
+
+.lesson-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin-bottom: var(--space-8);
+}
+
+.lesson-body p {
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  line-height: var(--leading-loose);
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+.lesson-audio {
+  background-color: var(--color-cream);
+  border: 1px solid var(--color-border-dark);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4) var(--space-5);
+  margin-bottom: var(--space-8);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+
+/* ──────────────────────────────────────────────────────────
+   LESSON PAGE — completion and navigation
+   ────────────────────────────────────────────────────────── */
+
+.lesson-complete-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4) 0;
+  border-top: 1px solid var(--color-border-dark);
+  border-bottom: 1px solid var(--color-border-dark);
+  margin-bottom: var(--space-8);
+}
+
+.lesson-complete-status {
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+/* Increased padding-top creates breathing room that signals "primary navigation area."
+   The larger gap separates it from the completion action above,
+   ensuring the nav reads as a distinct decision point, not a footer afterthought. */
+.lesson-nav {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--color-border);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+}
+
+/* Weight 500 makes prev/next links read as deliberate navigation actions,
+   not plain text links. */
+.lesson-nav a {
+  font-weight: 500;
+}
+
+.lesson-nav-back {
+  display: flex;
+  gap: var(--space-5);
+  margin-top: var(--space-4);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.lesson-nav-back a {
+  color: var(--color-text-muted);
+}
+
+.lesson-nav-back a:hover {
+  color: var(--color-navy);
+}

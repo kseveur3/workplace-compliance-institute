@@ -1,0 +1,67 @@
+/* ============================================================
+   Global Base Styles — The Institute Standard
+   ============================================================ */
+
+/* Reset */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+/* Body */
+body {
+  margin: 0;
+  background-color: var(--color-off-white);
+  color: var(--color-text-primary);
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Headings */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
+  color: var(--color-navy);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
+  margin: 0;
+}
+
+h1 { font-size: var(--text-4xl); }
+h2 { font-size: var(--text-3xl); }
+h3 { font-size: var(--text-2xl); }
+h4 { font-size: var(--text-xl); }
+h5 { font-size: var(--text-lg); }
+h6 { font-size: var(--text-base); }
+
+/* Paragraphs */
+p {
+  margin: 0;
+  color: var(--color-text-secondary);
+}
+
+/* Links */
+a {
+  color: var(--color-navy);
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 3px;
+  transition: color 0.15s ease, text-decoration-color 0.15s ease;
+}
+
+a:hover {
+  color: var(--color-gold);
+  text-decoration-color: var(--color-gold-light);
+}
+
+/* UI elements — use DM Sans */
+button, input, select, textarea, label, nav {
+  font-family: var(--font-ui);
+}
+
+/* Code */
+code, pre {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: var(--text-sm);
+}
