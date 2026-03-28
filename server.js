@@ -122,6 +122,30 @@ app.get("/payment-status", async (req, res) => {
   res.json({ paid: !!record });
 });
 
+// ── Email CTA click tracking ──────────────────────────────────────────────────
+// Records that the user clicked a renewal reminder email, then redirects home.
+app.get("/renew", async (req, res) => {
+  const { certId, type } = req.query;
+  const HOME = "https://workplace-compliance-institute-7038dd310f4d.herokuapp.com/";
+
+  if (certId && type) {
+    try {
+      await prisma.emailLog.updateMany({
+        where: {
+          certificationId: certId,
+          type,
+          clickedAt: null,
+        },
+        data: { clickedAt: new Date() },
+      });
+    } catch (err) {
+      console.error("[/renew] Failed to record click:", err.message);
+    }
+  }
+
+  res.redirect(302, HOME);
+});
+
 // ── SPA fallback ──────────────────────────────────────────────────────────────
 app.get("*", (_req, res) => {
   res.sendFile(join(__dirname, "dist", "index.html"));
