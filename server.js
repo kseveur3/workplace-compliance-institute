@@ -1,22 +1,18 @@
 import express from "express";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
-import { createRequire } from "module";
 import "dotenv/config";
 import Stripe from "stripe";
 import cors from "cors";
 import pkg from "@prisma/client";
 const { PrismaClient } = pkg;
-const require = createRequire(import.meta.url);
-const { PrismaBetterSqlite3 } = require("@prisma/adapter-better-sqlite3");
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = process.env.PORT || 3000;
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
-const adapter = new PrismaBetterSqlite3({ url: process.env.DATABASE_URL });
-const prisma = new PrismaClient({ adapter });
+const prisma = new PrismaClient();
 
 app.use(cors({ origin: "http://localhost:5173" }));
 
