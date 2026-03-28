@@ -4,6 +4,8 @@ import { dirname, join } from "path";
 import "dotenv/config";
 import Stripe from "stripe";
 import cors from "cors";
+import pg from "pg";
+import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -11,7 +13,9 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
-const prisma = new PrismaClient();
+const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+const adapter = new PrismaPg(pool);
+const prisma = new PrismaClient({ adapter });
 
 app.use(cors({ origin: "http://localhost:5173" }));
 

@@ -7,9 +7,13 @@ import { fileURLToPath } from "url";
 import "dotenv/config";
 import { getEmailForUser } from "./clerk-helpers.js";
 import { sendEmail } from "./email-service.js";
+import pg from "pg";
+import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
 
-const prisma = new PrismaClient();
+const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+const adapter = new PrismaPg(pool);
+const prisma = new PrismaClient({ adapter });
 
 // Reminder thresholds (in whole UTC days until expiration).
 const REMINDER_TYPES = [
