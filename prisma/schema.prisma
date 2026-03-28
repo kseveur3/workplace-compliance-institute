@@ -23,12 +23,13 @@ model PaidUser {
 }
 
 model Certification {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   clerkUserId String
   issuedAt    DateTime
   expiresAt   DateTime
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  renewedAt   DateTime? // set when the user renews their certification
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   emailLogs   EmailLog[]
 
@@ -37,11 +38,12 @@ model Certification {
 }
 
 model EmailLog {
-  id              String   @id @default(cuid())
+  id              String    @id @default(cuid())
   clerkUserId     String
   certificationId String
   type            String
-  sentAt          DateTime @default(now())
+  sentAt          DateTime  @default(now())
+  clickedAt       DateTime? // set when user clicks the email CTA
 
   certification   Certification @relation(fields: [certificationId], references: [id], onDelete: Cascade)
 
