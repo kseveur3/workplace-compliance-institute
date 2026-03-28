@@ -45,8 +45,10 @@ const BODY_TEXT = {
 };
 
 // Build a production-quality HTML email with logo, CTA, and footer.
-function buildEmailHtml(type) {
+// certId and type are included in the CTA link for click tracking.
+function buildEmailHtml(type, certId) {
   const body = BODY_TEXT[type];
+  const ctaUrl = `${APP_URL}/renew?certId=${encodeURIComponent(certId)}&type=${encodeURIComponent(type)}`;
   return `
 <!DOCTYPE html>
 <html lang="en">
@@ -74,7 +76,7 @@ function buildEmailHtml(type) {
         <!-- CTA -->
         <tr>
           <td align="center" style="padding-top:24px;">
-            <a href="${APP_URL}"
+            <a href="${ctaUrl}"
                style="display:inline-block;background:#2563eb;color:#ffffff;padding:12px 24px;text-decoration:none;border-radius:6px;font-family:Arial,sans-serif;font-weight:bold;font-size:15px;">
               Renew Certification
             </a>
@@ -156,7 +158,7 @@ export async function runRenewalJob() {
       await sendEmail({
         to: email,
         subject: SUBJECTS[type],
-        html: buildEmailHtml(type),
+        html: buildEmailHtml(type, cert.id),
         text: BODY_TEXT[type],
       });
 
