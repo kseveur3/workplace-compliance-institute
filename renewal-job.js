@@ -27,11 +27,74 @@ const REMINDER_TYPES = [
 
 // Subject line for each reminder type.
 const SUBJECTS = {
-  "30_day": "Your certification expires in 30 days",
-  "14_day": "Reminder: 14 days left to renew your certification",
-  "3_day":  "Final reminder: your certification expires in 3 days",
+  "30_day":  "Your certification expires in 30 days",
+  "14_day":  "Reminder: certification expires in 14 days",
+  "3_day":   "Final reminder: certification expires soon",
   "expired": "Your certification has expired",
 };
+
+const APP_URL = "https://workplace-compliance-institute-7038dd310f4d.herokuapp.com";
+const LOGO_URL = `${APP_URL}/logo-icon.png`;
+
+// Body copy for each reminder type.
+const BODY_TEXT = {
+  "30_day":  "Your Workplace Compliance Institute certification expires in 30 days. Renew now to keep your credentials current and avoid any lapse in compliance.",
+  "14_day":  "Your certification expires in 14 days. Don't wait — renew today to stay compliant and keep your certificate active.",
+  "3_day":   "Your certification expires in just 3 days. This is your final reminder to renew before your credentials lapse.",
+  "expired": "Your Workplace Compliance Institute certification has expired. Renew now to restore your compliance status.",
+};
+
+// Build a production-quality HTML email with logo, CTA, and footer.
+function buildEmailHtml(type) {
+  const body = BODY_TEXT[type];
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f4f4f5;">
+<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:#f4f4f5;">
+  <tr>
+    <td align="center" style="padding:32px 16px;">
+      <table width="500" cellpadding="0" cellspacing="0" role="presentation" style="background:#ffffff;border-radius:8px;padding:32px;">
+
+        <!-- Logo -->
+        <tr>
+          <td align="center" style="padding-bottom:24px;">
+            <img src="${LOGO_URL}" width="120" alt="Workplace Compliance Institute" style="display:block;">
+          </td>
+        </tr>
+
+        <!-- Body -->
+        <tr>
+          <td style="font-family:Arial,sans-serif;color:#333333;font-size:16px;line-height:1.6;">
+            <p style="margin:0 0 16px;">${body}</p>
+          </td>
+        </tr>
+
+        <!-- CTA -->
+        <tr>
+          <td align="center" style="padding-top:24px;">
+            <a href="${APP_URL}"
+               style="display:inline-block;background:#2563eb;color:#ffffff;padding:12px 24px;text-decoration:none;border-radius:6px;font-family:Arial,sans-serif;font-weight:bold;font-size:15px;">
+              Renew Certification
+            </a>
+          </td>
+        </tr>
+
+        <!-- Footer -->
+        <tr>
+          <td style="padding-top:32px;font-family:Arial,sans-serif;font-size:12px;color:#777777;text-align:center;">
+            Workplace Compliance Institute
+          </td>
+        </tr>
+
+      </table>
+    </td>
+  </tr>
+</table>
+</body>
+</html>`.trim();
+}
 
 // Calculate whole-day difference in UTC, avoiding local-timezone skew.
 function utcDaysUntil(expiresAt) {
@@ -93,8 +156,8 @@ export async function runRenewalJob() {
       await sendEmail({
         to: email,
         subject: SUBJECTS[type],
-        html: `<p>${SUBJECTS[type]}</p>`,
-        text: SUBJECTS[type],
+        html: buildEmailHtml(type),
+        text: BODY_TEXT[type],
       });
 
       await prisma.emailLog.create({
