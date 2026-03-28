@@ -9,7 +9,9 @@ import { getEmailForUser } from "./clerk-helpers.js";
 import { sendEmail } from "./email-service.js";
 import { PrismaClient } from "@prisma/client";
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({
+  datasources: { db: { url: process.env.DATABASE_URL } },
+});
 
 // Reminder thresholds (in whole UTC days until expiration).
 const REMINDER_TYPES = [
