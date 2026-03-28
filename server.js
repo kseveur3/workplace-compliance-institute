@@ -4,8 +4,7 @@ import { dirname, join } from "path";
 import "dotenv/config";
 import Stripe from "stripe";
 import cors from "cors";
-import pkg from "@prisma/client";
-const { PrismaClient } = pkg;
+import { PrismaClient } from "@prisma/client";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();

@@ -7,8 +7,7 @@ import { fileURLToPath } from "url";
 import "dotenv/config";
 import { getEmailForUser } from "./clerk-helpers.js";
 import { sendEmail } from "./email-service.js";
-import pkg from "@prisma/client";
-const { PrismaClient } = pkg;
+import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
