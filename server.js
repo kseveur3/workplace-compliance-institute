@@ -66,6 +66,18 @@ app.post(
       });
 
       console.log("Marked user as paid:", clerkUserId);
+
+      // Create a Certification record so renewal reminders can track expiry.
+      // issuedAt = now, expiresAt = 1 year from now.
+      const issuedAt = new Date();
+      const expiresAt = new Date(issuedAt);
+      expiresAt.setFullYear(expiresAt.getFullYear() + 1);
+
+      await prisma.certification.create({
+        data: { clerkUserId, issuedAt, expiresAt },
+      });
+
+      console.log("Created certification record for:", clerkUserId);
     }
 
     res.json({ received: true });
