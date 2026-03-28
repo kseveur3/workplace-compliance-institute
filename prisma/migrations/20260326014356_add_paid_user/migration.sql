@@ -1,5 +1,0 @@
--- CreateTable
-CREATE TABLE "PaidUser" (
-    "clerkUserId" TEXT NOT NULL PRIMARY KEY,
-    "paidAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
