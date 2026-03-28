@@ -3,18 +3,14 @@
 // sends a real email via Resend, then writes an EmailLog row on success.
 // Run manually: node renewal-job.js
 
-import { createRequire } from "module";
 import { fileURLToPath } from "url";
 import "dotenv/config";
 import { getEmailForUser } from "./clerk-helpers.js";
 import { sendEmail } from "./email-service.js";
 import pkg from "@prisma/client";
 const { PrismaClient } = pkg;
-const require = createRequire(import.meta.url);
-const { PrismaBetterSqlite3 } = require("@prisma/adapter-better-sqlite3");
 
-const adapter = new PrismaBetterSqlite3({ url: process.env.DATABASE_URL });
-const prisma = new PrismaClient({ adapter });
+const prisma = new PrismaClient();
 
 // Reminder thresholds (in whole UTC days until expiration).
 const REMINDER_TYPES = [
