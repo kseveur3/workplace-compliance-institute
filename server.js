@@ -4,6 +4,7 @@ import { dirname, join } from "path";
 import "dotenv/config";
 import Stripe from "stripe";
 import cors from "cors";
+import { clerkMiddleware, getAuth } from "@clerk/express";
 import pg from "pg";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
@@ -21,6 +22,7 @@ const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
 app.use(cors({ origin: "http://localhost:5173" }));
+app.use(clerkMiddleware());
 
 // ── Stripe webhook ────────────────────────────────────────────────────────────
 // MUST be registered before express.json(). Stripe signature verification
@@ -112,12 +114,16 @@ app.post("/create-checkout-session", async (req, res) => {
 
 // ── CEU renewal completion ────────────────────────────────────────────────────
 // Server-authoritative hook that marks a certification as renewed.
-// TODO: tighten CEU pass verification before production — currently trusts caller.
+// clerkUserId is read from the verified Clerk session — never trusted from the body.
 app.post("/ceu-complete", async (req, res) => {
-  const { clerkUserId, certId } = req.body;
+  const { userId: clerkUserId } = getAuth(req);
+  if (!clerkUserId) {
+    return res.status(401).json({ success: false, error: "Unauthorized" });
+  }
 
-  if (!clerkUserId || !certId) {
-    return res.status(400).json({ success: false, error: "clerkUserId and certId are required" });
+  const { certId } = req.body;
+  if (!certId) {
+    return res.status(400).json({ success: false, error: "certId is required" });
   }
 
   const cert = await prisma.certification.findFirst({
