@@ -22,7 +22,6 @@ const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
 app.use(cors({ origin: "http://localhost:5173" }));
-app.use(clerkMiddleware());
 
 // ── Stripe webhook ────────────────────────────────────────────────────────────
 // MUST be registered before express.json(). Stripe signature verification
@@ -115,7 +114,7 @@ app.post("/create-checkout-session", async (req, res) => {
 // ── CEU renewal completion ────────────────────────────────────────────────────
 // Server-authoritative hook that marks a certification as renewed.
 // clerkUserId is read from the verified Clerk session — never trusted from the body.
-app.post("/ceu-complete", async (req, res) => {
+app.post("/ceu-complete", clerkMiddleware(), async (req, res) => {
   const { userId: clerkUserId } = getAuth(req);
   if (!clerkUserId) {
     return res.status(401).json({ success: false, error: "Unauthorized" });
