@@ -69,8 +69,15 @@ app.post(
           console.error("CEU webhook missing certId:", session.id);
           return res.status(400).json({ error: "Missing certId in metadata" });
         }
-        await prisma.certification.update({
+        const ceuCert = await prisma.certification.findFirst({
           where: { id: certId, clerkUserId },
+        });
+        if (!ceuCert) {
+          console.error("CEU webhook: cert not found or ownership mismatch:", certId);
+          return res.status(400).json({ error: "Certification not found" });
+        }
+        await prisma.certification.update({
+          where: { id: certId },
           data: { ceuPaidAt: new Date() },
         });
         console.log("CEU payment recorded for cert:", certId, "user:", clerkUserId);
