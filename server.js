@@ -110,6 +110,36 @@ app.post("/create-checkout-session", async (req, res) => {
   }
 });
 
+// ── CEU renewal completion ────────────────────────────────────────────────────
+// Server-authoritative hook that marks a certification as renewed.
+// TODO: tighten CEU pass verification before production — currently trusts caller.
+app.post("/ceu-complete", async (req, res) => {
+  const { clerkUserId, certId } = req.body;
+
+  if (!clerkUserId || !certId) {
+    return res.status(400).json({ success: false, error: "clerkUserId and certId are required" });
+  }
+
+  const cert = await prisma.certification.findFirst({
+    where: { id: certId, clerkUserId },
+  });
+
+  if (!cert) {
+    return res.status(404).json({ success: false, error: "Certification not found" });
+  }
+
+  const issuedAt = new Date();
+  const expiresAt = new Date(cert.expiresAt);
+  expiresAt.setFullYear(expiresAt.getFullYear() + 1);
+
+  await prisma.certification.update({
+    where: { id: certId },
+    data: { renewedAt: issuedAt, issuedAt, expiresAt },
+  });
+
+  return res.json({ success: true });
+});
+
 // ── Payment status — server-side source of truth ──────────────────────────────
 app.get("/payment-status", async (req, res) => {
   const { clerkUserId } = req.query;
@@ -123,10 +153,11 @@ app.get("/payment-status", async (req, res) => {
 });
 
 // ── Email CTA click tracking ──────────────────────────────────────────────────
-// Records that the user clicked a renewal reminder email, then redirects home.
+// Records that the user clicked a renewal reminder email, then redirects to CEU flow.
 app.get("/renew", async (req, res) => {
   const { certId, type } = req.query;
-  const HOME = "https://workplace-compliance-institute-7038dd310f4d.herokuapp.com/";
+  const params = certId && type ? `?certId=${encodeURIComponent(certId)}&type=${encodeURIComponent(type)}` : "";
+  const REDIRECT = `https://workplace-compliance-institute-7038dd310f4d.herokuapp.com/ceu${params}`;
 
   if (certId && type) {
     try {
@@ -143,7 +174,7 @@ app.get("/renew", async (req, res) => {
     }
   }
 
-  res.redirect(302, HOME);
+  res.redirect(302, REDIRECT);
 });
 
 // ── SPA fallback ──────────────────────────────────────────────────────────────
