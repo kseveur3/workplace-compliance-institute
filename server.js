@@ -62,25 +62,40 @@ app.post(
           .json({ error: "Missing clerkUserId in metadata" });
       }
 
-      await prisma.paidUser.upsert({
-        where: { clerkUserId },
-        create: { clerkUserId },
-        update: {},
-      });
+      if (session.metadata?.productType === "ceu") {
+        // CEU renewal payment: unlock the exam for the specific certification.
+        const { certId } = session.metadata;
+        if (!certId) {
+          console.error("CEU webhook missing certId:", session.id);
+          return res.status(400).json({ error: "Missing certId in metadata" });
+        }
+        await prisma.certification.update({
+          where: { id: certId, clerkUserId },
+          data: { ceuPaidAt: new Date() },
+        });
+        console.log("CEU payment recorded for cert:", certId, "user:", clerkUserId);
+      } else {
+        // Full certification purchase.
+        await prisma.paidUser.upsert({
+          where: { clerkUserId },
+          create: { clerkUserId },
+          update: {},
+        });
 
-      console.log("Marked user as paid:", clerkUserId);
+        console.log("Marked user as paid:", clerkUserId);
 
-      // Create a Certification record so renewal reminders can track expiry.
-      // issuedAt = now, expiresAt = 1 year from now.
-      const issuedAt = new Date();
-      const expiresAt = new Date(issuedAt);
-      expiresAt.setFullYear(expiresAt.getFullYear() + 1);
+        // Create a Certification record so renewal reminders can track expiry.
+        // issuedAt = now, expiresAt = 1 year from now.
+        const issuedAt = new Date();
+        const expiresAt = new Date(issuedAt);
+        expiresAt.setFullYear(expiresAt.getFullYear() + 1);
 
-      await prisma.certification.create({
-        data: { clerkUserId, issuedAt, expiresAt },
-      });
+        await prisma.certification.create({
+          data: { clerkUserId, issuedAt, expiresAt },
+        });
 
-      console.log("Created certification record for:", clerkUserId);
+        console.log("Created certification record for:", clerkUserId);
+      }
     }
 
     res.json({ received: true });
@@ -139,10 +154,27 @@ app.post("/ceu-complete", clerkMiddleware(), async (req, res) => {
 
   await prisma.certification.update({
     where: { id: certId },
-    data: { renewedAt: issuedAt, issuedAt, expiresAt },
+    data: { renewedAt: issuedAt, issuedAt, expiresAt, ceuPaidAt: null },
   });
 
   return res.json({ success: true });
+});
+
+// ── CEU exam access check ─────────────────────────────────────────────────────
+// Returns { allowed: true } only when the user has a paid, unused CEU token.
+app.get("/ceu-access", clerkMiddleware(), async (req, res) => {
+  const { userId: clerkUserId } = getAuth(req);
+  if (!clerkUserId) {
+    return res.status(401).json({ allowed: false });
+  }
+  const { certId } = req.query;
+  if (!certId || typeof certId !== "string") {
+    return res.status(400).json({ allowed: false });
+  }
+  const cert = await prisma.certification.findFirst({
+    where: { id: certId, clerkUserId, ceuPaidAt: { not: null } },
+  });
+  res.json({ allowed: !!cert });
 });
 
 // ── Payment status — server-side source of truth ──────────────────────────────
