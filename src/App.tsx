@@ -1,5 +1,5 @@
 import { useState, useEffect, createContext, useContext } from 'react'
-import { Routes, Route, Link, Navigate, useParams, useNavigate, useLocation } from 'react-router-dom'
+import { Routes, Route, Link, Navigate, useParams, useNavigate, useLocation, useSearchParams } from 'react-router-dom'
 import { SignIn, SignUp, SignedIn, SignedOut, SignOutButton, useUser } from '@clerk/clerk-react'
 import './app.css'
 
