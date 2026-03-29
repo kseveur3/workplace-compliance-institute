@@ -958,7 +958,7 @@ function CeuPage() {
   if (!allowed) {
     return (
       <div className="exam-shell">
-        <h1 className="page-title" style={{ marginBottom: 'var(--sp-6)' }}>CEU Renewal</h1>
+        <h1 className="page-title" style={{ marginBottom: 'var(--sp-6)' }}>Certification Renewal (CEU)</h1>
         {expiresAt && <p style={{ fontFamily: 'var(--font-ui)', color: 'var(--color-muted)', marginBottom: 'var(--sp-4)' }}>Current Expiration: {expiresAt}</p>}
         <div className="info-panel info-panel--notice" style={{ marginTop: 'var(--sp-6)' }}>
           Payment required to access the CEU renewal exam.
@@ -994,8 +994,13 @@ function CeuPage() {
     return (
       <div className="exam-shell">
         <h1 className="page-title" style={{ marginBottom: 'var(--sp-6)' }}>
-          CEU Renewal Results
+          Certification Renewal (CEU) Results
         </h1>
+        {passed && (
+          <div className="info-panel info-panel--success" style={{ marginBottom: 'var(--sp-6)' }}>
+            Your certification has been successfully renewed.
+          </div>
+        )}
         <div className="exam-results-panel">
           <p className="results-label">Score</p>
           <p className="results-score">{correct}/{total}</p>
@@ -1042,7 +1047,7 @@ function CeuPage() {
   return (
     <div className="exam-shell">
       <Link to="/dashboard" className="page-back-link">← Back to Dashboard</Link>
-      <h1 className="quiz-heading">CEU Renewal Exam</h1>
+      <h1 className="quiz-heading">Certification Renewal (CEU)</h1>
       {expiresAt && <p style={{ fontFamily: 'var(--font-ui)', color: 'var(--color-muted)', marginBottom: 'var(--sp-4)' }}>Current Expiration: {expiresAt}</p>}
 
       <div className="quiz-progress">
