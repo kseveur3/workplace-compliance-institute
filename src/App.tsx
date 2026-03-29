@@ -916,14 +916,45 @@ function FinalExamPage() {
 
 function CeuPage() {
   const { user } = useUser()
+  const { getToken } = useAuth()
   const [searchParams] = useSearchParams()
   const certId = searchParams.get('certId')
+
+  const [accessChecked, setAccessChecked] = useState(false)
+  const [allowed, setAllowed] = useState(false)
+
+  useEffect(() => {
+    if (!certId) { setAccessChecked(true); return }
+    getToken().then((token) => {
+      fetch(`/ceu-access?certId=${encodeURIComponent(certId)}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+        .then((r) => r.json())
+        .then((data) => { setAllowed(!!data.allowed); setAccessChecked(true) })
+        .catch(() => setAccessChecked(true))
+    })
+  }, [certId, getToken])
 
   const [currentIndex, setCurrentIndex] = useState(0)
   const [answers, setAnswers] = useState<(number | null)[]>(
     Array(CEU_QUESTIONS.length).fill(null)
   )
   const [showResults, setShowResults] = useState(false)
+
+  if (!accessChecked) {
+    return <div className="exam-shell"><p>Loading...</p></div>
+  }
+
+  if (!allowed) {
+    return (
+      <div className="exam-shell">
+        <h1 className="page-title" style={{ marginBottom: 'var(--sp-6)' }}>CEU Renewal</h1>
+        <div className="info-panel info-panel--notice" style={{ marginTop: 'var(--sp-6)' }}>
+          Payment required to access the CEU renewal exam.
+        </div>
+      </div>
+    )
+  }
 
   if (showResults) {
     const correct = answers.filter(
