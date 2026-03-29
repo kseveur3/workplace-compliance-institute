@@ -922,6 +922,16 @@ function CeuPage() {
 
   const [accessChecked, setAccessChecked] = useState(false)
   const [allowed, setAllowed] = useState(false)
+  const [expiresAt, setExpiresAt] = useState<string | null>(null)
+
+  useEffect(() => {
+    getToken().then((token) => {
+      fetch('/my-certification', { headers: { Authorization: `Bearer ${token}` } })
+        .then((r) => r.json())
+        .then((data) => { if (data?.expiresAt) setExpiresAt(new Date(data.expiresAt).toLocaleDateString()) })
+        .catch(() => {})
+    })
+  }, [getToken])
 
   useEffect(() => {
     if (!certId) { setAccessChecked(true); return }
@@ -949,6 +959,7 @@ function CeuPage() {
     return (
       <div className="exam-shell">
         <h1 className="page-title" style={{ marginBottom: 'var(--sp-6)' }}>CEU Renewal</h1>
+        {expiresAt && <p style={{ fontFamily: 'var(--font-ui)', color: 'var(--color-muted)', marginBottom: 'var(--sp-4)' }}>Current Expiration: {expiresAt}</p>}
         <div className="info-panel info-panel--notice" style={{ marginTop: 'var(--sp-6)' }}>
           Payment required to access the CEU renewal exam.
         </div>
@@ -1032,6 +1043,7 @@ function CeuPage() {
     <div className="exam-shell">
       <Link to="/dashboard" className="page-back-link">← Back to Dashboard</Link>
       <h1 className="quiz-heading">CEU Renewal Exam</h1>
+      {expiresAt && <p style={{ fontFamily: 'var(--font-ui)', color: 'var(--color-muted)', marginBottom: 'var(--sp-4)' }}>Current Expiration: {expiresAt}</p>}
 
       <div className="quiz-progress">
         <div className="quiz-progress__fill" style={{ width: `${progressPct}%` }} />
