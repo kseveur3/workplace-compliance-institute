@@ -182,17 +182,19 @@ app.get("/renew", async (req, res) => {
   res.redirect(302, REDIRECT);
 });
 
-// ── Temporary debug route — CEU testing only ─────────────────────────────────
-app.get("/debug-certifications", async (req, res) => {
-  const { clerkUserId } = req.query;
-  if (!clerkUserId || typeof clerkUserId !== "string") {
-    return res.status(400).json({ error: "clerkUserId is required" });
+// ── Current user's most recent certification ──────────────────────────────────
+// Returns the latest Certification record for the authenticated user.
+app.get("/my-certification", clerkMiddleware(), async (req, res) => {
+  const { userId: clerkUserId } = getAuth(req);
+  if (!clerkUserId) {
+    return res.status(401).json({ error: "Unauthorized" });
   }
-  const certs = await prisma.certification.findMany({
+  const cert = await prisma.certification.findFirst({
     where: { clerkUserId },
-    select: { id: true, clerkUserId: true, issuedAt: true, renewedAt: true, expiresAt: true },
+    orderBy: { createdAt: "desc" },
+    select: { id: true, issuedAt: true, expiresAt: true, renewedAt: true },
   });
-  res.json(certs);
+  res.json(cert ?? null);
 });
 
 // ── SPA fallback ──────────────────────────────────────────────────────────────
