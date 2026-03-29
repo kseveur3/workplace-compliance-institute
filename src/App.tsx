@@ -129,6 +129,48 @@ const FINAL_EXAM_QUESTIONS: QuizQuestion[] = [
   },
 ]
 
+const CEU_QUESTIONS: QuizQuestion[] = [
+  {
+    id: 'ceu-1',
+    question: 'Which federal agency is the primary enforcement body for EEO laws in the United States?',
+    options: [
+      'Department of Labor',
+      'Office of Personnel Management',
+      'Equal Employment Opportunity Commission (EEOC)',
+      'Department of Justice',
+    ],
+    correctIndex: 2,
+  },
+  {
+    id: 'ceu-2',
+    question: 'Title VII of the Civil Rights Act of 1964 prohibits discrimination based on all of the following EXCEPT:',
+    options: ['Race', 'National origin', 'Political affiliation', 'Religion'],
+    correctIndex: 2,
+  },
+  {
+    id: 'ceu-3',
+    question: 'In a disparate treatment claim, the burden-shifting framework was established in:',
+    options: [
+      'Harris v. Forklift Systems',
+      'McDonnell Douglas Corp. v. Green',
+      'Meritor Savings Bank v. Vinson',
+      'Burlington Industries v. Ellerth',
+    ],
+    correctIndex: 1,
+  },
+  {
+    id: 'ceu-4',
+    question: 'A hostile work environment claim requires that the conduct be:',
+    options: [
+      'Physical and intentional',
+      'Reported to a supervisor before filing',
+      'Both subjectively and objectively offensive',
+      'Committed only by a supervisor',
+    ],
+    correctIndex: 2,
+  },
+]
+
 const COURSE: Course = {
   id: 'eeo-investigator',
   title: 'EEO Investigator Certification',
@@ -852,6 +894,152 @@ function FinalExamPage() {
   )
 }
 
+// ─── CEU Renewal Exam Page ────────────────────────────────────────────────────
+
+function CeuPage() {
+  const { user } = useUser()
+  const [searchParams] = useSearchParams()
+  const certId = searchParams.get('certId')
+
+  const [currentIndex, setCurrentIndex] = useState(0)
+  const [answers, setAnswers] = useState<(number | null)[]>(
+    Array(CEU_QUESTIONS.length).fill(null)
+  )
+  const [showResults, setShowResults] = useState(false)
+
+  if (showResults) {
+    const correct = answers.filter(
+      (a, i) => a === CEU_QUESTIONS[i].correctIndex
+    ).length
+    const total = CEU_QUESTIONS.length
+    const passed = correct / total >= 0.8
+
+    return (
+      <div className="exam-shell">
+        <h1 className="page-title" style={{ marginBottom: 'var(--sp-6)' }}>
+          CEU Renewal Results
+        </h1>
+        <div className="exam-results-panel">
+          <p className="results-label">Score</p>
+          <p className="results-score">{correct}/{total}</p>
+          <p
+            style={{
+              fontFamily: 'var(--font-ui)',
+              fontWeight: 700,
+              fontSize: '0.8rem',
+              letterSpacing: '0.06em',
+              textTransform: 'uppercase',
+              color: passed ? 'var(--color-success)' : 'var(--color-error)',
+              marginTop: 'var(--sp-3)',
+            }}
+          >
+            {passed ? '✓ Renewal exam passed.' : '✗ Renewal exam failed.'}
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: 'var(--sp-4)' }}>
+          {!passed && (
+            <button
+              className="btn-primary"
+              onClick={() => {
+                setAnswers(Array(CEU_QUESTIONS.length).fill(null))
+                setCurrentIndex(0)
+                setShowResults(false)
+              }}
+            >
+              Retry Exam
+            </button>
+          )}
+          <Link to="/dashboard" className="btn-secondary">
+            Back to Dashboard
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
+  const question = CEU_QUESTIONS[currentIndex]
+  const selected = answers[currentIndex]
+  const isLast = currentIndex === CEU_QUESTIONS.length - 1
+  const progressPct = Math.round((currentIndex / CEU_QUESTIONS.length) * 100)
+
+  return (
+    <div className="exam-shell">
+      <Link to="/dashboard" className="page-back-link">← Back to Dashboard</Link>
+      <h1 className="quiz-heading">CEU Renewal Exam</h1>
+
+      <div className="quiz-progress">
+        <div className="quiz-progress__fill" style={{ width: `${progressPct}%` }} />
+      </div>
+
+      <p className="quiz-counter">
+        Question {currentIndex + 1} of {CEU_QUESTIONS.length}
+      </p>
+
+      <p className="quiz-question">{question.question}</p>
+
+      <div className="quiz-options">
+        {question.options.map((option, i) => (
+          <button
+            key={i}
+            className={`quiz-option${selected === i ? ' quiz-option--selected' : ''}`}
+            onClick={() =>
+              setAnswers((prev) => {
+                const next = [...prev]
+                next[currentIndex] = i
+                return next
+              })
+            }
+          >
+            <span className="quiz-option__dot" />
+            <span className="quiz-option__label">{option}</span>
+          </button>
+        ))}
+      </div>
+
+      <button
+        className="quiz-submit"
+        disabled={selected === null}
+        onClick={async () => {
+          if (isLast) {
+            const correct = answers.filter(
+              (a, i) => a === CEU_QUESTIONS[i].correctIndex
+            ).length
+            const passed = correct / CEU_QUESTIONS.length >= 0.8
+
+            if (passed && certId && user?.id) {
+              // Trigger CEU renewal on pass
+              try {
+                await fetch('/ceu-complete', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ clerkUserId: user.id, certId }),
+                })
+              } catch (err) {
+                console.error('Failed to record CEU renewal:', err)
+              }
+            }
+
+            setShowResults(true)
+          } else {
+            setCurrentIndex((i) => i + 1)
+          }
+        }}
+      >
+        {isLast ? 'Submit Exam' : 'Next Question'}
+      </button>
+    </div>
+  )
+}
+
+function ProtectedCeu() {
+  return (
+    <>
+      <SignedIn><CeuPage /></SignedIn>
+      <SignedOut><Navigate to="/sign-in" replace /></SignedOut>
+    </>
+  )
+}
+
 // ─── Certificate Page ─────────────────────────────────────────────────────────
 
 function CertificatePage() {
@@ -1217,6 +1405,7 @@ export default function App() {
         <Route path="/verify" element={<VerifyPage />} />
         <Route path="/checkout-success" element={<CheckoutSuccessPage />} />
         <Route path="/checkout-cancel" element={<CheckoutCancelPage />} />
+        <Route path="/ceu" element={<ProtectedCeu />} />
       </Routes>
     </CompletionContext.Provider>
   )
