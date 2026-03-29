@@ -1,6 +1,6 @@
 import { useState, useEffect, createContext, useContext } from 'react'
 import { Routes, Route, Link, Navigate, useParams, useNavigate, useLocation, useSearchParams } from 'react-router-dom'
-import { SignIn, SignUp, SignedIn, SignedOut, SignOutButton, useUser } from '@clerk/clerk-react'
+import { SignIn, SignUp, SignedIn, SignedOut, SignOutButton, useUser, useAuth } from '@clerk/clerk-react'
 import './app.css'
 
 interface Lesson {
@@ -346,9 +346,22 @@ function HomePage() {
 
 function DashboardPage() {
   const { user } = useUser()
+  const { getToken } = useAuth()
   const { completed, quizResults } = useCompletion()
   const totalLessons = COURSE.sections.reduce((sum, s) => sum + s.lessons.length, 0)
   const quizzesPassed = COURSE.sections.filter((s) => quizResults[s.id] === 'passed').length
+
+  const [certId, setCertId] = useState<string | null>(null)
+
+  useEffect(() => {
+    getToken().then((token) => {
+      if (!token) return
+      fetch('/my-certification', { headers: { Authorization: `Bearer ${token}` } })
+        .then((r) => r.json())
+        .then((data) => { if (data?.id) setCertId(data.id) })
+        .catch(() => {})
+    })
+  }, [getToken])
 
   return (
     <div className="page-shell">
@@ -377,6 +390,11 @@ function DashboardPage() {
 
       <div className="action-row">
         <Link to="/course" className="link-btn">View Course</Link>
+        {certId && (
+          <Link to={`/ceu?certId=${certId}&type=dashboard`} className="btn-primary">
+            Renew Certification
+          </Link>
+        )}
         <SignOutButton />
       </div>
     </div>
