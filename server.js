@@ -133,6 +133,40 @@ app.post("/create-checkout-session", async (req, res) => {
   }
 });
 
+// ── CEU checkout session creation ────────────────────────────────────────────
+app.post("/create-ceu-checkout-session", clerkMiddleware(), async (req, res) => {
+  const { userId: clerkUserId } = getAuth(req);
+  if (!clerkUserId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  const { certId } = req.body;
+  if (!certId) {
+    return res.status(400).json({ error: "certId is required" });
+  }
+
+  const cert = await prisma.certification.findFirst({
+    where: { id: certId, clerkUserId },
+  });
+  if (!cert) {
+    return res.status(404).json({ error: "Certification not found" });
+  }
+
+  const CLIENT_URL = process.env.CLIENT_URL || "http://localhost:5173";
+  try {
+    const session = await stripe.checkout.sessions.create({
+      mode: "payment",
+      line_items: [{ price: process.env.STRIPE_CEU_PRICE_ID, quantity: 1 }],
+      success_url: `${CLIENT_URL}/ceu?certId=${certId}&type=paid`,
+      cancel_url: `${CLIENT_URL}/ceu?certId=${certId}&type=cancel`,
+      metadata: { clerkUserId, certId, productType: "ceu" },
+    });
+    res.json({ url: session.url });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── CEU renewal completion ────────────────────────────────────────────────────
 // Server-authoritative hook that marks a certification as renewed.
 // clerkUserId is read from the verified Clerk session — never trusted from the body.
