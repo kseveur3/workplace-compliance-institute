@@ -28,6 +28,7 @@ model Certification {
   issuedAt    DateTime
   expiresAt   DateTime
   renewedAt   DateTime? // set when the user renews their certification
+  ceuPaidAt   DateTime? // set when the user pays for CEU renewal; cleared after renewal completes
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
