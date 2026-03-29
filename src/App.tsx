@@ -952,6 +952,23 @@ function CeuPage() {
         <div className="info-panel info-panel--notice" style={{ marginTop: 'var(--sp-6)' }}>
           Payment required to access the CEU renewal exam.
         </div>
+        <div style={{ marginTop: 'var(--sp-6)' }}>
+          <button
+            className="btn-primary"
+            onClick={async () => {
+              const token = await getToken()
+              const res = await fetch('/create-ceu-checkout-session', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ certId }),
+              })
+              const data = await res.json()
+              if (data.url) window.location.href = data.url
+            }}
+          >
+            Purchase CEU Renewal
+          </button>
+        </div>
       </div>
     )
   }
