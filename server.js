@@ -177,6 +177,19 @@ app.get("/renew", async (req, res) => {
   res.redirect(302, REDIRECT);
 });
 
+// ── Temporary debug route — CEU testing only ─────────────────────────────────
+app.get("/debug-certifications", async (req, res) => {
+  const { clerkUserId } = req.query;
+  if (!clerkUserId || typeof clerkUserId !== "string") {
+    return res.status(400).json({ error: "clerkUserId is required" });
+  }
+  const certs = await prisma.certification.findMany({
+    where: { clerkUserId },
+    select: { id: true, clerkUserId: true, issuedAt: true, renewedAt: true, expiresAt: true },
+  });
+  res.json(certs);
+});
+
 // ── SPA fallback ──────────────────────────────────────────────────────────────
 app.get("*", (_req, res) => {
   res.sendFile(join(__dirname, "dist", "index.html"));
