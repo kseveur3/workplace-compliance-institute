@@ -1,348 +1,343 @@
 import { useState } from 'react'
-import { useUser } from '@clerk/clerk-react'
+import { useUser, useClerk } from '@clerk/clerk-react'
 
 const ADMIN_EMAIL = 'kseveur@gmail.com'
 
-interface LessonContent {
-  title: string
-  estimatedTime: string
-  body: string[]
+// ── Shared styles ─────────────────────────────────────────────────────────────
+
+const PANEL_LABEL: React.CSSProperties = {
+  fontFamily: 'var(--font-ui)',
+  fontWeight: 600,
+  fontSize: '0.8rem',
+  letterSpacing: '0.06em',
+  textTransform: 'uppercase',
+  color: 'var(--text-muted)',
+  marginBottom: 'var(--sp-3)',
 }
 
-interface ExampleItem {
-  title: string
-  scenario: string
+const PANEL: React.CSSProperties = {
+  border: '1.5px solid var(--border)',
+  borderRadius: 'var(--r-lg)',
+  padding: 'var(--sp-5)',
+  background: 'var(--bg-card)',
 }
 
-interface QuizQuestion {
-  question: string
-  options: string[]
-  correctAnswerIndex: number
-  explanation: string
+const BODY: React.CSSProperties = {
+  fontFamily: 'var(--font-ui)',
+  fontSize: '0.9rem',
+  color: 'var(--text-primary)',
+  lineHeight: 1.6,
 }
+
+const MUTED: React.CSSProperties = {
+  fontFamily: 'var(--font-ui)',
+  color: 'var(--border-dark)',
+  fontSize: '0.9rem',
+}
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+interface CertResult {
+  sourceSummary: string
+  curriculumOutline: { section: string; lessons: number }[]
+  lessons: { section: string; lessons: { title: string; estimatedTime: string; content: string[] }[] }[]
+  examples: { title: string; scenario: string }[]
+  sectionQuizzes: { section: string; questions: { question: string; options: string[]; correctIndex: number }[] }[]
+  finalExam: { totalQuestions: number; passingScore: string; coverage: string[] }
+}
+
+interface CeuResult {
+  detectedChanges: string[]
+  ceuLessons: string[]
+  ceuQuiz: { question: string; correctAnswer: string }[]
+}
+
+// ── Output Panel ─────────────────────────────────────────────────────────────
+
+function OutputPanel({ label, children }: { label: string; children?: React.ReactNode }) {
+  return (
+    <div style={PANEL}>
+      <p style={PANEL_LABEL}>{label}</p>
+      {children ?? <p style={MUTED}>Output will appear here.</p>}
+    </div>
+  )
+}
+
+// ── Page ─────────────────────────────────────────────────────────────────────
 
 export function AdminAiContentPage() {
-  const { user } = useUser()
+  const { user, isLoaded } = useUser()
+  const { signOut } = useClerk()
 
   const primaryEmail = user?.primaryEmailAddress?.emailAddress
 
-  const [sectionName, setSectionName] = useState('')
-  const [lessonTopic, setLessonTopic] = useState('')
-  const [notes, setNotes] = useState('')
-  const [lessonDraft, setLessonDraft] = useState('')
-  const [lessonContent, setLessonContent] = useState<LessonContent | null>(null)
-  const [exampleDraft, setExampleDraft] = useState('')
-  const [exampleContent, setExampleContent] = useState<ExampleItem[] | null>(null)
-  const [quizDraft, setQuizDraft] = useState('')
-  const [quizContent, setQuizContent] = useState<QuizQuestion[] | null>(null)
-  const [activeGenerationType, setActiveGenerationType] = useState<string | null>(null)
-  const [lessonCopied, setLessonCopied] = useState(false)
+  const [certLoading, setCertLoading] = useState(false)
+  const [certResult, setCertResult] = useState<CertResult | null>(null)
+  const [certError, setCertError] = useState<string | null>(null)
+  const [certCopied, setCertCopied] = useState(false)
+  const [certLoaded, setCertLoaded] = useState(false)
 
+  const [ceuLoading, setCeuLoading] = useState(false)
+  const [ceuResult, setCeuResult] = useState<CeuResult | null>(null)
+  const [ceuError, setCeuError] = useState<string | null>(null)
+
+  if (!isLoaded) return <p>Loading...</p>
   if (primaryEmail !== ADMIN_EMAIL) {
     return <p>Access denied. Set ADMIN_EMAIL in admin-ai-content.tsx.</p>
   }
 
-  async function handleGenerateQuiz() {
-    setActiveGenerationType('quiz')
-    setQuizContent(null)
-    setQuizDraft('Generating quiz...')
+  async function handleGenerateCertification() {
+    console.log('CLICKED generate')
+    setCertLoading(true)
+    setCertResult(null)
+    setCertError(null)
     try {
-      const res = await fetch('/api/admin/generate-content', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sectionTitle: sectionName, topic: lessonTopic, notes, generationType: 'quiz' }),
-      })
-      const data = await res.json()
+      console.log('BEFORE fetch')
+      const res = await fetch('http://localhost:3000/api/admin/generate-certification', { method: 'POST' })
+      console.log('AFTER fetch')
+      console.log('status', res.status)
+      console.log('headers', Object.fromEntries(res.headers.entries()))
+      const text = await res.text()
+      console.log('AFTER text')
+      console.log('raw response', text)
+      const data = JSON.parse(text)
+      console.log('AFTER parse')
       if (!res.ok) {
-        setQuizDraft(`Error: ${data.error ?? 'Request failed'}`)
-        return
+        setCertError(data.error ?? 'Request failed.')
+      } else {
+        setCertResult(data)
       }
-      setQuizContent(data.content.questions)
-      setQuizDraft('')
     } catch (err: any) {
-      setQuizDraft(`Error: ${err.message ?? 'Unexpected error'}`)
+      setCertError(err.message ?? 'Unexpected error.')
+    } finally {
+      setCertLoading(false)
     }
   }
 
-  async function handleGenerateExamples() {
-    setActiveGenerationType('examples')
-    setExampleContent(null)
-    setExampleDraft('Generating examples...')
+  async function handleScanCeuUpdates() {
+    setCeuLoading(true)
+    setCeuResult(null)
+    setCeuError(null)
     try {
-      const res = await fetch('/api/admin/generate-content', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sectionTitle: sectionName, topic: lessonTopic, notes, generationType: 'examples' }),
-      })
+      const res = await fetch('http://localhost:3000/api/admin/scan-ceu-updates', { method: 'POST' })
       const data = await res.json()
       if (!res.ok) {
-        setExampleDraft(`Error: ${data.error ?? 'Request failed'}`)
-        return
+        setCeuError(data.error ?? 'Request failed.')
+      } else {
+        setCeuResult(data)
       }
-      setExampleContent(data.content.examples)
-      setExampleDraft('')
     } catch (err: any) {
-      setExampleDraft(`Error: ${err.message ?? 'Unexpected error'}`)
+      setCeuError(err.message ?? 'Unexpected error.')
+    } finally {
+      setCeuLoading(false)
     }
   }
 
-  async function handleGenerateLesson() {
-    setActiveGenerationType('lesson')
-    setLessonContent(null)
-    setLessonDraft('Generating lesson...')
-    try {
-      const res = await fetch('/api/admin/generate-content', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sectionTitle: sectionName, topic: lessonTopic, notes, generationType: 'lesson' }),
-      })
-      const data = await res.json()
-      if (!res.ok) {
-        setLessonDraft(`Error: ${data.error ?? 'Request failed'}`)
-        return
-      }
-      setLessonContent(data.content)
-      setLessonDraft('')
-    } catch (err: any) {
-      setLessonDraft(`Error: ${err.message ?? 'Unexpected error'}`)
-    }
-  }
+  const certErr = (msg: string) => <p style={{ ...MUTED, color: 'var(--color-error)' }}>{msg}</p>
 
   return (
-    <div style={{ maxWidth: 720, margin: '0 auto', padding: 'var(--sp-10) var(--sp-6)' }}>
+    <div style={{ maxWidth: 800, margin: '0 auto', padding: 'var(--sp-10) var(--sp-6)' }}>
+
+      {/* Top bar */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 'var(--sp-4)' }}>
+        <button className="btn-secondary" type="button" onClick={() => signOut({ redirectUrl: '/admin/sign-in' })}>Logout</button>
+      </div>
+
       <h1 className="page-title" style={{ marginBottom: 'var(--sp-2)' }}>AI Content Generator</h1>
-      <p style={{ fontFamily: 'var(--font-ui)', color: 'var(--text-muted)', marginBottom: 'var(--sp-8)' }}>
-        Generate lesson drafts, examples, and quizzes for admin review.
+      <p style={{ fontFamily: 'var(--font-ui)', color: 'var(--text-muted)', marginBottom: 'var(--sp-12)' }}>
+        Admin tools for generating and updating certification content using AI.
       </p>
 
-      {/* Inputs */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-5)', marginBottom: 'var(--sp-8)' }}>
-        <label style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-2)', fontFamily: 'var(--font-ui)', fontWeight: 600, fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-          Section Name
-          <input
-            type="text"
-            placeholder="e.g. Workplace Harassment"
-            value={sectionName}
-            onChange={(e) => setSectionName(e.target.value)}
-            style={{
-              fontFamily: 'var(--font-ui)',
-              fontSize: '0.95rem',
-              padding: 'var(--sp-3) var(--sp-4)',
-              border: '1.5px solid var(--border)',
-              borderRadius: 'var(--r-md)',
-              background: 'var(--bg-card)',
-              color: 'var(--text-primary)',
-              outline: 'none',
-            }}
-          />
-        </label>
+      {/* ── Section A: Full Certification Builder ── */}
+      <section style={{ marginBottom: 'var(--sp-12)' }}>
+        <h2 style={{ fontFamily: 'var(--font-display)', color: 'var(--text-h)', fontSize: '1.4rem', marginBottom: 'var(--sp-2)' }}>
+          Full Certification Builder
+        </h2>
+        <p style={{ fontFamily: 'var(--font-ui)', color: 'var(--text-secondary)', fontSize: '0.95rem', marginBottom: 'var(--sp-6)' }}>
+          Generates a complete certification course from EEOC source material. Produces a structured curriculum,
+          lessons, real-world examples, section quizzes, and a final exam — ready for admin review before publishing.
+        </p>
 
-        <label style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-2)', fontFamily: 'var(--font-ui)', fontWeight: 600, fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-          Lesson Topic
-          <input
-            type="text"
-            placeholder="e.g. Recognizing hostile work environment"
-            value={lessonTopic}
-            onChange={(e) => setLessonTopic(e.target.value)}
-            style={{
-              fontFamily: 'var(--font-ui)',
-              fontSize: '0.95rem',
-              padding: 'var(--sp-3) var(--sp-4)',
-              border: '1.5px solid var(--border)',
-              borderRadius: 'var(--r-md)',
-              background: 'var(--bg-card)',
-              color: 'var(--text-primary)',
-              outline: 'none',
-            }}
-          />
-        </label>
+        <div style={{ marginBottom: 'var(--sp-8)' }}>
+          <button className="btn-primary" type="button" onClick={handleGenerateCertification} disabled={certLoading}>
+            {certLoading ? 'Generating...' : 'Generate Full Certification'}
+          </button>
+        </div>
 
-        <label style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-2)', fontFamily: 'var(--font-ui)', fontWeight: 600, fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-          Notes / Instructions
-          <textarea
-            placeholder="Any specific tone, coverage, or constraints..."
-            rows={4}
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            style={{
-              fontFamily: 'var(--font-ui)',
-              fontSize: '0.95rem',
-              padding: 'var(--sp-3) var(--sp-4)',
-              border: '1.5px solid var(--border)',
-              borderRadius: 'var(--r-md)',
-              background: 'var(--bg-card)',
-              color: 'var(--text-primary)',
-              resize: 'vertical',
-              outline: 'none',
-            }}
-          />
-        </label>
-      </div>
+        {certResult && (
+          <div style={{ marginBottom: 'var(--sp-8)' }}>
+            <button
+              className="btn-secondary"
+              type="button"
+              onClick={() => {
+                navigator.clipboard.writeText(JSON.stringify(certResult, null, 2))
+                setCertCopied(true)
+                setTimeout(() => setCertCopied(false), 2500)
+              }}
+            >
+              Copy Certification JSON
+            </button>
+            {certCopied && <p style={{ ...MUTED, marginTop: 'var(--sp-2)' }}>Certification JSON copied</p>}
+            <button
+              className="btn-secondary"
+              type="button"
+              style={{ marginTop: 'var(--sp-3)' }}
+              onClick={() => {
+                localStorage.setItem('generatedCertification', JSON.stringify(certResult))
+                setCertLoaded(true)
+                setTimeout(() => setCertLoaded(false), 2500)
+              }}
+            >
+              Load Certification (Temp)
+            </button>
+            {certLoaded && <p style={{ ...MUTED, marginTop: 'var(--sp-2)' }}>Certification loaded locally</p>}
+          </div>
+        )}
 
-      {/* Action buttons */}
-      <div style={{ display: 'flex', gap: 'var(--sp-4)', flexWrap: 'wrap', marginBottom: 'var(--sp-10)' }}>
-        <button
-          className="btn-primary"
-          type="button"
-          onClick={handleGenerateLesson}
-        >
-          Generate Lesson
-        </button>
-        <button
-          className="btn-secondary"
-          type="button"
-          onClick={handleGenerateExamples}
-        >
-          Generate Examples
-        </button>
-        <button
-          className="btn-secondary"
-          type="button"
-          onClick={handleGenerateQuiz}
-        >
-          Generate Quiz
-        </button>
-      </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-5)' }}>
 
-      {/* Result panels */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-6)' }}>
+          <OutputPanel label="Source Summary">
+            {certLoading && <p style={MUTED}>Generating source summary...</p>}
+            {certError && certErr(certError)}
+            {certResult && <p style={BODY}>{certResult.sourceSummary}</p>}
+          </OutputPanel>
 
-        {/* Lesson Draft */}
-        <div style={{
-          border: '1.5px solid var(--border)',
-          borderRadius: 'var(--r-lg)',
-          padding: 'var(--sp-5)',
-          background: 'var(--bg-card)',
-        }}>
-          <p style={{
-            fontFamily: 'var(--font-ui)',
-            fontWeight: 600,
-            fontSize: '0.8rem',
-            letterSpacing: '0.06em',
-            textTransform: 'uppercase',
-            color: 'var(--text-muted)',
-            marginBottom: 'var(--sp-3)',
-          }}>
-            Lesson Draft
-          </p>
-          {lessonContent ? (
-            <div style={{ fontFamily: 'var(--font-ui)', fontSize: '0.9rem', color: 'var(--text-primary)' }}>
-              <p style={{ fontWeight: 600, marginBottom: 'var(--sp-1)' }}>{lessonContent.title}</p>
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginBottom: 'var(--sp-4)' }}>{lessonContent.estimatedTime}</p>
-              {lessonContent.body.map((para, i) => (
-                <p key={i} style={{ marginBottom: 'var(--sp-3)' }}>{para}</p>
-              ))}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-4)', marginTop: 'var(--sp-4)' }}>
-                <button
-                  className="btn-secondary"
-                  type="button"
-                  onClick={() => {
-                    const slug = lessonContent.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
-                    const lessonJson = JSON.stringify({
-                      id: slug,
-                      title: lessonContent.title,
-                      estimatedTime: lessonContent.estimatedTime,
-                      content: lessonContent.body,
-                      narrationPlaceholder: '',
-                    }, null, 2)
-                    navigator.clipboard.writeText(lessonJson).then(() => {
-                      setLessonCopied(true)
-                      setTimeout(() => setLessonCopied(false), 2500)
-                    })
-                  }}
-                >
-                  Copy as Lesson JSON
-                </button>
-                {lessonCopied && (
-                  <span style={{ fontFamily: 'var(--font-ui)', fontSize: '0.82rem', color: 'var(--color-success)' }}>Lesson JSON copied</span>
-                )}
+          <OutputPanel label="Curriculum Outline">
+            {certLoading && <p style={MUTED}>Generating curriculum outline...</p>}
+            {certError && certErr(certError)}
+            {certResult && (
+              <ul style={{ ...BODY, paddingLeft: 'var(--sp-5)', margin: 0 }}>
+                {certResult.curriculumOutline.map((s, i) => (
+                  <li key={i} style={{ marginBottom: 'var(--sp-1)' }}>
+                    <strong>{s.section}</strong> — {s.lessons} lessons
+                  </li>
+                ))}
+              </ul>
+            )}
+          </OutputPanel>
+
+          <OutputPanel label="Lessons">
+            {certLoading && <p style={MUTED}>Generating lessons...</p>}
+            {certError && certErr(certError)}
+            {certResult && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-4)' }}>
+                {certResult.lessons.map((s, i) => (
+                  <div key={i}>
+                    <p style={{ ...BODY, fontWeight: 600, marginBottom: 'var(--sp-1)' }}>{s.section}</p>
+                    <ul style={{ ...BODY, paddingLeft: 'var(--sp-5)', margin: 0 }}>
+                      {Array.isArray(s.lessons) && s.lessons.map((l, j) => <li key={j}>{l.title}</li>)}
+                    </ul>
+                  </div>
+                ))}
               </div>
-            </div>
-          ) : (
-            <p style={{ fontFamily: 'var(--font-ui)', color: lessonDraft ? 'var(--text-primary)' : 'var(--border-dark)', fontSize: '0.9rem' }}>
-              {lessonDraft || 'Output will appear here.'}
-            </p>
-          )}
+            )}
+          </OutputPanel>
+
+          <OutputPanel label="Examples">
+            {certLoading && <p style={MUTED}>Generating examples...</p>}
+            {certError && certErr(certError)}
+            {certResult && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-4)' }}>
+                {certResult.examples.map((ex, i) => (
+                  <div key={i}>
+                    <p style={{ ...BODY, fontWeight: 600, marginBottom: 'var(--sp-1)' }}>{ex.title}</p>
+                    <p style={BODY}>{ex.scenario}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </OutputPanel>
+
+          <OutputPanel label="Section Quizzes">
+            {certLoading && <p style={MUTED}>Generating section quizzes...</p>}
+            {certError && certErr(certError)}
+            {certResult && (
+              <ul style={{ ...BODY, paddingLeft: 'var(--sp-5)', margin: 0 }}>
+                {certResult.sectionQuizzes.map((q, i) => (
+                  <li key={i} style={{ marginBottom: 'var(--sp-1)' }}>
+                    {q.section} — {Array.isArray(q.questions) ? q.questions.length : 0} questions
+                  </li>
+                ))}
+              </ul>
+            )}
+          </OutputPanel>
+
+          <OutputPanel label="Final Exam">
+            {certLoading && <p style={MUTED}>Generating final exam...</p>}
+            {certError && certErr(certError)}
+            {certResult && (
+              <div style={BODY}>
+                <ul style={{ paddingLeft: 'var(--sp-5)', margin: '0 0 var(--sp-3)' }}>
+                  {certResult.finalExam.coverage.map((c, i) => <li key={i}>{c}</li>)}
+                </ul>
+                <p><strong>Total questions:</strong> {certResult.finalExam.totalQuestions} &nbsp;|&nbsp; <strong>Passing score:</strong> {certResult.finalExam.passingScore}</p>
+              </div>
+            )}
+          </OutputPanel>
+
+        </div>
+      </section>
+
+      {/* ── Section B: Annual CEU Builder ── */}
+      <section>
+        <h2 style={{ fontFamily: 'var(--font-display)', color: 'var(--text-h)', fontSize: '1.4rem', marginBottom: 'var(--sp-2)' }}>
+          Annual CEU Builder
+        </h2>
+        <p style={{ fontFamily: 'var(--font-ui)', color: 'var(--text-secondary)', fontSize: '0.95rem', marginBottom: 'var(--sp-6)' }}>
+          Scans for EEOC regulatory updates and generates annual CEU renewal training based on detected changes.
+          Keeps certification content current without manual review of source documents.
+        </p>
+
+        <div style={{ marginBottom: 'var(--sp-8)' }}>
+          <button className="btn-secondary" type="button" onClick={handleScanCeuUpdates} disabled={ceuLoading}>
+            {ceuLoading ? 'Scanning...' : 'Scan EEOC Updates'}
+          </button>
         </div>
 
-        {/* Example Scenarios */}
-        <div style={{
-          border: '1.5px solid var(--border)',
-          borderRadius: 'var(--r-lg)',
-          padding: 'var(--sp-5)',
-          background: 'var(--bg-card)',
-        }}>
-          <p style={{
-            fontFamily: 'var(--font-ui)',
-            fontWeight: 600,
-            fontSize: '0.8rem',
-            letterSpacing: '0.06em',
-            textTransform: 'uppercase',
-            color: 'var(--text-muted)',
-            marginBottom: 'var(--sp-3)',
-          }}>
-            Example Scenarios
-          </p>
-          {exampleContent ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-4)' }}>
-              {exampleContent.map((ex, i) => (
-                <div key={i}>
-                  <p style={{ fontFamily: 'var(--font-ui)', fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-primary)', marginBottom: 'var(--sp-1)' }}>{ex.title}</p>
-                  <p style={{ fontFamily: 'var(--font-ui)', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>{ex.scenario}</p>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p style={{ fontFamily: 'var(--font-ui)', color: exampleDraft ? 'var(--text-primary)' : 'var(--border-dark)', fontSize: '0.9rem' }}>
-              {exampleDraft || 'Output will appear here.'}
-            </p>
-          )}
-        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-5)' }}>
 
-        {/* Quiz Draft */}
-        <div style={{
-          border: '1.5px solid var(--border)',
-          borderRadius: 'var(--r-lg)',
-          padding: 'var(--sp-5)',
-          background: 'var(--bg-card)',
-        }}>
-          <p style={{
-            fontFamily: 'var(--font-ui)',
-            fontWeight: 600,
-            fontSize: '0.8rem',
-            letterSpacing: '0.06em',
-            textTransform: 'uppercase',
-            color: 'var(--text-muted)',
-            marginBottom: 'var(--sp-3)',
-          }}>
-            Quiz Draft
-          </p>
-          {quizContent ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-6)' }}>
-              {quizContent.map((q, i) => (
-                <div key={i}>
-                  <p style={{ fontFamily: 'var(--font-ui)', fontWeight: 600, fontSize: '0.9rem', color: 'var(--text-primary)', marginBottom: 'var(--sp-2)' }}>{i + 1}. {q.question}</p>
-                  <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 var(--sp-2)', display: 'flex', flexDirection: 'column', gap: 'var(--sp-1)' }}>
-                    {q.options.map((opt, j) => (
-                      <li key={j} style={{ fontFamily: 'var(--font-ui)', fontSize: '0.88rem', color: j === q.correctAnswerIndex ? 'var(--color-success)' : 'var(--text-secondary)' }}>
-                        {j === q.correctAnswerIndex ? '✓ ' : '   '}{opt}
-                      </li>
-                    ))}
-                  </ul>
-                  {q.explanation && (
-                    <p style={{ fontFamily: 'var(--font-ui)', fontSize: '0.82rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>{q.explanation}</p>
-                  )}
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p style={{ fontFamily: 'var(--font-ui)', color: quizDraft ? 'var(--text-primary)' : 'var(--border-dark)', fontSize: '0.9rem' }}>
-              {quizDraft || 'Output will appear here.'}
-            </p>
-          )}
-        </div>
+          <OutputPanel label="Detected Changes">
+            {ceuLoading && <p style={MUTED}>Scanning for EEOC changes...</p>}
+            {ceuError && certErr(ceuError)}
+            {ceuResult && (
+              <ul style={{ ...BODY, paddingLeft: 'var(--sp-5)', margin: 0 }}>
+                {ceuResult.detectedChanges.map((c, i) => (
+                  <li key={i} style={{ marginBottom: 'var(--sp-2)' }}>{c}</li>
+                ))}
+              </ul>
+            )}
+          </OutputPanel>
 
-      </div>
+          <OutputPanel label="CEU Lessons">
+            {ceuLoading && <p style={MUTED}>Generating CEU lessons...</p>}
+            {ceuError && certErr(ceuError)}
+            {ceuResult && (
+              <ul style={{ ...BODY, paddingLeft: 'var(--sp-5)', margin: 0 }}>
+                {ceuResult.ceuLessons.map((l, i) => (
+                  <li key={i} style={{ marginBottom: 'var(--sp-1)' }}>{l}</li>
+                ))}
+              </ul>
+            )}
+          </OutputPanel>
+
+          <OutputPanel label="CEU Quiz">
+            {ceuLoading && <p style={MUTED}>Generating CEU quiz...</p>}
+            {ceuError && certErr(ceuError)}
+            {ceuResult && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-4)' }}>
+                {ceuResult.ceuQuiz.map((q, i) => (
+                  <div key={i}>
+                    <p style={{ ...BODY, fontWeight: 600, marginBottom: 'var(--sp-1)' }}>{i + 1}. {q.question}</p>
+                    <p style={{ ...BODY, color: 'var(--color-success)' }}>✓ {q.correctAnswer}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </OutputPanel>
+
+        </div>
+      </section>
+
     </div>
   )
 }

@@ -239,7 +239,74 @@ const COURSE: Course = {
   ],
 }
 
-const ALL_LESSONS = COURSE.sections.flatMap((s) => s.lessons)
+function loadActiveCourse(): Course {
+  try {
+    const raw = localStorage.getItem('generatedCertification')
+    if (raw) {
+      const gen = JSON.parse(raw)
+      console.log('Using generated certification')
+      const sections: Section[] = (gen.lessons as { section: string; lessons: { title: string; estimatedTime: string; content: string[] }[] }[]).map((group, si) => ({
+        id: `section-${si + 1}`,
+        title: group.section,
+        lessons: group.lessons.map((lesson, li) => ({
+          id: `lesson-${si + 1}-${li + 1}`,
+          title: lesson.title,
+          estimatedTime: lesson.estimatedTime,
+          content: lesson.content,
+          narrationPlaceholder: `Audio narration for ${lesson.title} coming soon.`,
+        })),
+      }))
+      return { id: COURSE.id, title: COURSE.title, sections }
+    }
+  } catch { /* ignore parse errors */ }
+  console.log('Using default COURSE')
+  return COURSE
+}
+
+function loadActiveQuizzes(): SectionQuiz[] {
+  try {
+    const raw = localStorage.getItem('generatedCertification')
+    if (raw) {
+      const gen = JSON.parse(raw)
+      if (Array.isArray(gen.sectionQuizzes) && gen.sectionQuizzes[0]?.questions?.[0]?.question) {
+        return (gen.sectionQuizzes as { section: string; questions: { question: string; options: string[]; correctIndex: number }[] }[]).map((sq, si) => ({
+          sectionId: `section-${si + 1}`,
+          questions: sq.questions.map((q, qi) => ({
+            id: `gen-q${si + 1}-${qi + 1}`,
+            question: q.question,
+            options: q.options,
+            correctIndex: q.correctIndex,
+          })),
+        }))
+      }
+    }
+  } catch { /* ignore parse errors */ }
+  return QUIZZES
+}
+
+function loadActiveFinalExam(): QuizQuestion[] {
+  try {
+    const raw = localStorage.getItem('generatedCertification')
+    if (raw) {
+      const gen = JSON.parse(raw)
+      if (Array.isArray(gen.finalExam?.questions) && gen.finalExam.questions[0]?.question) {
+        return gen.finalExam.questions.map((q: { question: string; options: string[]; correctIndex: number }, i: number) => ({
+          id: `gen-fe-${i + 1}`,
+          question: q.question,
+          options: q.options,
+          correctIndex: q.correctIndex,
+        }))
+      }
+    }
+  } catch { /* ignore parse errors */ }
+  return FINAL_EXAM_QUESTIONS
+}
+
+const ACTIVE_COURSE = loadActiveCourse()
+const ACTIVE_QUIZZES = loadActiveQuizzes()
+const ACTIVE_FINAL_EXAM = loadActiveFinalExam()
+
+const ALL_LESSONS = ACTIVE_COURSE.sections.flatMap((s) => s.lessons)
 
 type QuizResult = 'passed' | 'failed'
 
@@ -349,8 +416,8 @@ function DashboardPage() {
   const { user } = useUser()
   const { getToken } = useAuth()
   const { completed, quizResults } = useCompletion()
-  const totalLessons = COURSE.sections.reduce((sum, s) => sum + s.lessons.length, 0)
-  const quizzesPassed = COURSE.sections.filter((s) => quizResults[s.id] === 'passed').length
+  const totalLessons = ACTIVE_COURSE.sections.reduce((sum, s) => sum + s.lessons.length, 0)
+  const quizzesPassed = ACTIVE_COURSE.sections.filter((s) => quizResults[s.id] === 'passed').length
 
   const [certId, setCertId] = useState<string | null>(null)
 
@@ -385,7 +452,7 @@ function DashboardPage() {
         <p className="dash-course-progress">
           {completed.size} of {totalLessons} lessons completed
           {quizzesPassed > 0 &&
-            ` · ${quizzesPassed} of ${COURSE.sections.length} section quizzes passed`}
+            ` · ${quizzesPassed} of ${ACTIVE_COURSE.sections.length} section quizzes passed`}
         </p>
       </div>
 
@@ -404,7 +471,7 @@ function DashboardPage() {
 
 // ─── Course Page ──────────────────────────────────────────────────────────────
 
-const TOTAL_LESSONS = COURSE.sections.reduce((sum, s) => sum + s.lessons.length, 0)
+const TOTAL_LESSONS = ACTIVE_COURSE.sections.reduce((sum, s) => sum + s.lessons.length, 0)
 
 function CoursePage() {
   const { completed, quizResults, finalExamResult } = useCompletion()
@@ -421,7 +488,7 @@ function CoursePage() {
   )?.quizSummary
 
   const allLessonsDone = ALL_LESSONS.every((l) => completed.has(l.id))
-  const allQuizzesPassed = COURSE.sections.every((s) => quizResults[s.id] === 'passed')
+  const allQuizzesPassed = ACTIVE_COURSE.sections.every((s) => quizResults[s.id] === 'passed')
   const eligible = allLessonsDone && allQuizzesPassed
 
   return (
@@ -429,7 +496,7 @@ function CoursePage() {
       <Link to="/dashboard" className="page-back-link">← Back to Dashboard</Link>
 
       <div className="page-header">
-        <h1 className="page-title">{COURSE.title}</h1>
+        <h1 className="page-title">{ACTIVE_COURSE.title}</h1>
         <p className="page-subtitle">
           Progress: {completed.size} of {TOTAL_LESSONS} lessons completed
         </p>
@@ -514,7 +581,7 @@ function CoursePage() {
       )}
 
       {/* Sections */}
-      {COURSE.sections.map((section) => {
+      {ACTIVE_COURSE.sections.map((section) => {
         const quizResult = quizResults[section.id]
         const quizLabel =
           quizResult === 'passed'
@@ -564,11 +631,11 @@ function LessonPage() {
   const { completed, toggle } = useCompletion()
 
   let foundLesson: {
-    section: (typeof COURSE.sections)[0]
-    lesson: (typeof COURSE.sections)[0]['lessons'][0]
+    section: (typeof ACTIVE_COURSE.sections)[0]
+    lesson: (typeof ACTIVE_COURSE.sections)[0]['lessons'][0]
   } | null = null
 
-  for (const section of COURSE.sections) {
+  for (const section of ACTIVE_COURSE.sections) {
     const lesson = section.lessons.find((l) => l.id === id)
     if (lesson) {
       foundLesson = { section, lesson }
@@ -645,8 +712,8 @@ function QuizPage() {
   const { setQuizResult } = useCompletion()
   const navigate = useNavigate()
 
-  const quiz = QUIZZES.find((q) => q.sectionId === sectionId)
-  const section = COURSE.sections.find((s) => s.id === sectionId)
+  const quiz = ACTIVE_QUIZZES.find((q) => q.sectionId === sectionId)
+  const section = ACTIVE_COURSE.sections.find((s) => s.id === sectionId)
 
   const [currentIndex, setCurrentIndex] = useState(0)
   const [answers, setAnswers] = useState<(number | null)[]>(() =>
@@ -737,16 +804,18 @@ function QuizPage() {
 
 // ─── Final Exam Page ──────────────────────────────────────────────────────────
 
+const DEV_BYPASS_FINAL_EXAM = true // TODO: remove before production
+
 function FinalExamPage() {
   const { completed, quizResults, finalExamResult, setFinalExamResult } = useCompletion()
   const { user } = useUser()
   const allLessonsDone = ALL_LESSONS.every((l) => completed.has(l.id))
-  const allQuizzesPassed = COURSE.sections.every((s) => quizResults[s.id] === 'passed')
-  const eligible = allLessonsDone && allQuizzesPassed
+  const allQuizzesPassed = ACTIVE_COURSE.sections.every((s) => quizResults[s.id] === 'passed')
+  const eligible = DEV_BYPASS_FINAL_EXAM || (allLessonsDone && allQuizzesPassed)
 
   const [currentIndex, setCurrentIndex] = useState(0)
   const [answers, setAnswers] = useState<(number | null)[]>(
-    Array(FINAL_EXAM_QUESTIONS.length).fill(null)
+    Array(ACTIVE_FINAL_EXAM.length).fill(null)
   )
   const [showResults, setShowResults] = useState(false)
 
@@ -780,9 +849,9 @@ function FinalExamPage() {
 
   if (showResults) {
     const correct = answers.filter(
-      (a, i) => a === FINAL_EXAM_QUESTIONS[i].correctIndex
+      (a, i) => a === ACTIVE_FINAL_EXAM[i].correctIndex
     ).length
-    const total = FINAL_EXAM_QUESTIONS.length
+    const total = ACTIVE_FINAL_EXAM.length
     const passed = correct / total >= 0.8
 
     return (
@@ -814,7 +883,7 @@ function FinalExamPage() {
             <button
               className="btn-primary"
               onClick={() => {
-                setAnswers(Array(FINAL_EXAM_QUESTIONS.length).fill(null))
+                setAnswers(Array(ACTIVE_FINAL_EXAM.length).fill(null))
                 setCurrentIndex(0)
                 setShowResults(false)
               }}
@@ -830,10 +899,10 @@ function FinalExamPage() {
     )
   }
 
-  const question = FINAL_EXAM_QUESTIONS[currentIndex]
+  const question = ACTIVE_FINAL_EXAM[currentIndex]
   const selected = answers[currentIndex]
-  const isLast = currentIndex === FINAL_EXAM_QUESTIONS.length - 1
-  const progressPct = Math.round((currentIndex / FINAL_EXAM_QUESTIONS.length) * 100)
+  const isLast = currentIndex === ACTIVE_FINAL_EXAM.length - 1
+  const progressPct = Math.round((currentIndex / ACTIVE_FINAL_EXAM.length) * 100)
 
   return (
     <div className="exam-shell">
@@ -845,7 +914,7 @@ function FinalExamPage() {
       </div>
 
       <p className="quiz-counter">
-        Question {currentIndex + 1} of {FINAL_EXAM_QUESTIONS.length}
+        Question {currentIndex + 1} of {ACTIVE_FINAL_EXAM.length}
       </p>
 
       <p className="quiz-question">{question.question}</p>
@@ -875,9 +944,9 @@ function FinalExamPage() {
         onClick={() => {
           if (isLast) {
             const correct = answers.filter(
-              (a, i) => a === FINAL_EXAM_QUESTIONS[i].correctIndex
+              (a, i) => a === ACTIVE_FINAL_EXAM[i].correctIndex
             ).length
-            const passed = correct / FINAL_EXAM_QUESTIONS.length >= 0.8
+            const passed = correct / ACTIVE_FINAL_EXAM.length >= 0.8
             setFinalExamResult(passed ? 'passed' : 'failed')
             if (passed) {
               const email = user?.primaryEmailAddress?.emailAddress
@@ -895,7 +964,7 @@ function FinalExamPage() {
                   day: 'numeric',
                 })
                 const idx = records.findIndex((r) => r.email === email)
-                const record = { email, courseName: COURSE.title, completionDate: date }
+                const record = { email, courseName: ACTIVE_COURSE.title, completionDate: date }
                 if (idx >= 0) records[idx] = record
                 else records.push(record)
                 localStorage.setItem('wci_certifications', JSON.stringify(records))
@@ -1314,9 +1383,13 @@ function CheckoutCancelPage() {
 
 // ─── Guards ───────────────────────────────────────────────────────────────────
 
+const DEV_BYPASS_PAID_GUARD = true // TODO: remove before production
+
 function PaidGuard({ children }: { children: React.ReactNode }) {
   const { paid, paidLoading } = useCompletion()
-  if (paidLoading) return null
+  const { isLoaded: clerkLoaded, isSignedIn } = useUser()
+  if (DEV_BYPASS_PAID_GUARD) return <>{children}</>
+  if (!clerkLoaded || !isSignedIn || paidLoading) return null
   if (!paid) return <Navigate to="/" replace />
   return <>{children}</>
 }
@@ -1490,7 +1563,8 @@ export default function App() {
         <Route path="/checkout-success" element={<CheckoutSuccessPage />} />
         <Route path="/checkout-cancel" element={<CheckoutCancelPage />} />
         <Route path="/ceu" element={<ProtectedCeu />} />
-        <Route path="/admin/ai-content" element={<><SignedIn><AdminAiContentPage /></SignedIn><SignedOut><Navigate to="/sign-in" replace /></SignedOut></>} />
+        <Route path="/admin/sign-in/*" element={<SignIn routing="path" path="/admin/sign-in" fallbackRedirectUrl="/admin/ai-content" />} />
+        <Route path="/admin/ai-content" element={<><SignedIn><AdminAiContentPage /></SignedIn><SignedOut><Navigate to="/admin/sign-in" replace /></SignedOut></>} />
       </Routes>
     </CompletionContext.Provider>
   )
