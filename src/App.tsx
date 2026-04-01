@@ -1,4 +1,5 @@
 import { useState, useEffect, createContext, useContext } from 'react'
+import { AdminAiContentPage } from './pages/admin-ai-content'
 import { Routes, Route, Link, Navigate, useParams, useNavigate, useLocation, useSearchParams } from 'react-router-dom'
 import { SignIn, SignUp, SignedIn, SignedOut, SignOutButton, useUser, useAuth } from '@clerk/clerk-react'
 import './app.css'
@@ -1489,6 +1490,7 @@ export default function App() {
         <Route path="/checkout-success" element={<CheckoutSuccessPage />} />
         <Route path="/checkout-cancel" element={<CheckoutCancelPage />} />
         <Route path="/ceu" element={<ProtectedCeu />} />
+        <Route path="/admin/ai-content" element={<><SignedIn><AdminAiContentPage /></SignedIn><SignedOut><Navigate to="/sign-in" replace /></SignedOut></>} />
       </Routes>
     </CompletionContext.Provider>
   )

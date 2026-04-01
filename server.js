@@ -8,6 +8,7 @@ import { clerkMiddleware, getAuth } from "@clerk/express";
 import pg from "pg";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
+import Anthropic from "@anthropic-ai/sdk";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -268,6 +269,129 @@ app.get("/my-certification", clerkMiddleware(), async (req, res) => {
     select: { id: true, issuedAt: true, expiresAt: true, renewedAt: true },
   });
   res.json(cert ?? null);
+});
+
+// ── Admin: AI content generation ─────────────────────────────────────────────
+app.post("/api/admin/generate-content", async (req, res) => {
+  const { sectionTitle, topic, notes, generationType } = req.body;
+
+  if (generationType !== "lesson" && generationType !== "examples" && generationType !== "quiz") {
+    return res.status(400).json({ error: "Unsupported generationType." });
+  }
+
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return res.status(500).json({ error: "ANTHROPIC_API_KEY is not configured." });
+  }
+
+  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+  const context = `Section: ${sectionTitle || "General Compliance"}\nTopic: ${topic}\nNotes: ${notes || "None"}`;
+
+  const lessonPrompt = `You are an instructional writer for workplace compliance training.
+
+Generate a lesson for the following:
+${context}
+
+Return ONLY a JSON object with no markdown, no code fences, no extra text. The shape must be exactly:
+{
+  "title": "A clear, professional lesson title",
+  "estimatedTime": "X minutes",
+  "body": [
+    "First paragraph...",
+    "Second paragraph...",
+    "Third paragraph..."
+  ]
+}
+
+Rules:
+- Professional HR/workplace compliance tone
+- Concise and readable
+- No fake citations or legal overclaiming
+- Body must be an array of short paragraphs (3–5 items)
+- No HTML tags`;
+
+  const examplesPrompt = `You are an instructional writer for workplace compliance training.
+
+Generate 2–3 realistic workplace scenario examples for the following:
+${context}
+
+Return ONLY a JSON object with no markdown, no code fences, no extra text. The shape must be exactly:
+{
+  "examples": [
+    { "title": "Short scenario title", "scenario": "One or two sentence description of the scenario." },
+    { "title": "Short scenario title", "scenario": "One or two sentence description of the scenario." }
+  ]
+}
+
+Rules:
+- Realistic workplace investigation or EEO-style scenarios
+- Professional tone
+- Concise
+- No fake citations or legal overclaiming
+- No HTML tags`;
+
+  const quizPrompt = `You are an instructional writer for workplace compliance training.
+
+Generate a multiple choice quiz for the following:
+${context}
+
+Return ONLY a JSON object with no markdown, no code fences, no extra text. The shape must be exactly:
+{
+  "questions": [
+    {
+      "question": "The question text",
+      "options": ["Option A", "Option B", "Option C", "Option D"],
+      "correctAnswerIndex": 0,
+      "explanation": "Brief explanation of the correct answer."
+    }
+  ]
+}
+
+Rules:
+- Generate 3–5 questions
+- Exactly 4 options per question
+- Exactly one correct answer per question (indicated by correctAnswerIndex, zero-based)
+- Professional HR/workplace compliance tone
+- No trick wording
+- No fake citations or legal overclaiming
+- No HTML tags`;
+
+  const prompt = generationType === "lesson" ? lessonPrompt : generationType === "examples" ? examplesPrompt : quizPrompt;
+
+  try {
+    const message = await anthropic.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 1024,
+      messages: [{ role: "user", content: prompt }],
+    });
+
+    const raw = message.content[0].text.trim();
+    let content;
+    try {
+      content = JSON.parse(raw);
+    } catch {
+      return res.status(500).json({ error: "AI returned invalid JSON. Try again." });
+    }
+
+    if (generationType === "lesson") {
+      if (!content.title || !content.estimatedTime || !Array.isArray(content.body)) {
+        return res.status(500).json({ error: "AI response was missing expected fields." });
+      }
+    } else if (generationType === "examples") {
+      if (!Array.isArray(content.examples)) {
+        return res.status(500).json({ error: "AI response was missing expected fields." });
+      }
+    } else {
+      if (!Array.isArray(content.questions)) {
+        return res.status(500).json({ error: "AI response was missing expected fields." });
+      }
+    }
+
+    return res.json({ success: true, generationType, content });
+  } catch (err) {
+    console.error("[generate-content] AI call failed:", err.message);
+    return res.status(500).json({ error: "AI generation failed. Please try again." });
+  }
 });
 
 // ── SPA fallback ──────────────────────────────────────────────────────────────
