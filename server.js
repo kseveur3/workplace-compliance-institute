@@ -220,12 +220,19 @@ app.get("/ceu-access", clerkMiddleware(), async (req, res) => {
 
 // ── Payment status — server-side source of truth ──────────────────────────────
 app.get("/payment-status", async (req, res) => {
-  const { clerkUserId } = req.query;
-  if (!clerkUserId || typeof clerkUserId !== "string") {
-    return res.status(400).json({ error: "clerkUserId is required" });
+  try {
+    const { clerkUserId } = req.query;
+    if (!clerkUserId || typeof clerkUserId !== "string") {
+      return res.status(400).json({ error: "clerkUserId is required" });
+    }
+    const record = await prisma.paidUser.findUnique({
+      where: { clerkUserId },
+    });
+    res.json({ paid: !!record });
+  } catch (err) {
+    console.error("[/payment-status]", err);
+    res.status(500).json({ error: "payment-status failed" });
   }
-  // TODO: restore Prisma lookup once DB is stable
-  res.json({ paid: true });
 });
 
 // ── Email CTA click tracking ──────────────────────────────────────────────────

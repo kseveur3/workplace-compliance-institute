@@ -93,7 +93,7 @@ export function AdminAiContentPage() {
     setCertError(null)
     try {
       console.log('BEFORE fetch')
-      const res = await fetch('http://localhost:3000/api/admin/generate-certification', { method: 'POST' })
+      const res = await fetch('/api/admin/generate-certification', { method: 'POST' })
       console.log('AFTER fetch')
       console.log('status', res.status)
       console.log('headers', Object.fromEntries(res.headers.entries()))
@@ -119,7 +119,7 @@ export function AdminAiContentPage() {
     setCeuResult(null)
     setCeuError(null)
     try {
-      const res = await fetch('http://localhost:3000/api/admin/scan-ceu-updates', { method: 'POST' })
+      const res = await fetch('/api/admin/scan-ceu-updates', { method: 'POST' })
       const data = await res.json()
       if (!res.ok) {
         setCeuError(data.error ?? 'Request failed.')

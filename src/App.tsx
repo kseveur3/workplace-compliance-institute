@@ -804,7 +804,7 @@ function QuizPage() {
 
 // ─── Final Exam Page ──────────────────────────────────────────────────────────
 
-const DEV_BYPASS_FINAL_EXAM = true // TODO: remove before production
+const DEV_BYPASS_FINAL_EXAM = false // TODO: remove before production
 
 function FinalExamPage() {
   const { completed, quizResults, finalExamResult, setFinalExamResult } = useCompletion()
@@ -1383,7 +1383,7 @@ function CheckoutCancelPage() {
 
 // ─── Guards ───────────────────────────────────────────────────────────────────
 
-const DEV_BYPASS_PAID_GUARD = true // TODO: remove before production
+const DEV_BYPASS_PAID_GUARD = false // TODO: remove before production
 
 function PaidGuard({ children }: { children: React.ReactNode }) {
   const { paid, paidLoading } = useCompletion()
