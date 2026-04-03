@@ -392,14 +392,20 @@ function HomePage() {
           {paid ? (
             <Link to="/dashboard" className="btn-primary">Go to Dashboard</Link>
           ) : (
-            <button
-              onClick={handlePurchase}
-              disabled={purchasing}
-              className="btn-teal"
-              style={{ opacity: purchasing ? 0.7 : 1 }}
-            >
-              {purchasing ? 'Redirecting…' : 'Purchase Certification'}
-            </button>
+            <div className="home-btn-row" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 'var(--sp-3)' }}>
+              <button
+                onClick={handlePurchase}
+                disabled={purchasing}
+                className="btn-teal"
+                style={{ opacity: purchasing ? 0.7 : 1 }}
+              >
+                {purchasing ? 'Redirecting…' : 'Purchase Certification'}
+              </button>
+              <Link to="/ceu" className="btn-secondary">Renew Certification (CEU)</Link>
+              <SignOutButton>
+                <button className="link-btn" style={{ fontFamily: 'var(--font-ui)', fontSize: '0.875rem' }}>Log out</button>
+              </SignOutButton>
+            </div>
           )}
         </SignedIn>
 
@@ -1572,7 +1578,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/sign-in/*" element={<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 'var(--sp-10)' }}><div style={{ width: 'fit-content' }}><Link to="/" className="page-back-link" style={{ display: 'inline-block', marginBottom: '12px', color: 'var(--text-secondary)', fontWeight: 600, textDecoration: 'underline' }}>← Back to Home</Link><SignIn routing="path" path="/sign-in" /></div></div>} />
-        <Route path="/sign-up/*" element={<SignUp routing="path" path="/sign-up" />} />
+        <Route path="/sign-up/*" element={<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 'var(--sp-10)' }}><div style={{ width: 'fit-content' }}><Link to="/" className="page-back-link" style={{ display: 'inline-block', marginBottom: '12px', color: 'var(--text-secondary)', fontWeight: 600, textDecoration: 'underline' }}>← Back to Home</Link><SignUp routing="path" path="/sign-up" /></div></div>} />
         <Route path="/dashboard" element={<ProtectedDashboard />} />
         <Route path="/course" element={<ProtectedCourse />} />
         <Route path="/lesson/:id" element={<ProtectedLesson />} />
