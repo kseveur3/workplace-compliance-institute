@@ -424,7 +424,6 @@ function HomePage() {
 
 function DashboardPage() {
   const { user } = useUser()
-  const { getToken } = useAuth()
   const { completed, quizResults } = useCompletion()
   const totalLessons = ACTIVE_COURSE.sections.reduce((sum, s) => sum + s.lessons.length, 0)
   const quizzesPassed = ACTIVE_COURSE.sections.filter((s) => quizResults[s.id] === 'passed').length
