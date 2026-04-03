@@ -429,18 +429,7 @@ function DashboardPage() {
   const totalLessons = ACTIVE_COURSE.sections.reduce((sum, s) => sum + s.lessons.length, 0)
   const quizzesPassed = ACTIVE_COURSE.sections.filter((s) => quizResults[s.id] === 'passed').length
 
-  const [certId, setCertId] = useState<string | null>(null)
   const [ceuStatusText, setCeuStatusText] = useState("")
-
-  useEffect(() => {
-    getToken().then((token) => {
-      if (!token) return
-      fetch('/my-certification', { headers: { Authorization: `Bearer ${token}` } })
-        .then((r) => r.json())
-        .then((data) => { if (data?.id) setCertId(data.id) })
-        .catch(() => {})
-    })
-  }, [getToken])
 
   useEffect(() => {
     if (!user?.id) return
