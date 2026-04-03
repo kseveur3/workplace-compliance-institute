@@ -392,19 +392,23 @@ function HomePage() {
           {paid ? (
             <Link to="/dashboard" className="btn-primary">Go to Dashboard</Link>
           ) : (
-            <div className="home-btn-row" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 'var(--sp-3)' }}>
-              <button
-                onClick={handlePurchase}
-                disabled={purchasing}
-                className="btn-teal"
-                style={{ opacity: purchasing ? 0.7 : 1 }}
-              >
-                {purchasing ? 'Redirecting…' : 'Purchase Certification'}
-              </button>
-              <Link to="/ceu" className="btn-secondary">Renew Certification (CEU)</Link>
-              <SignOutButton>
-                <button className="link-btn" style={{ fontFamily: 'var(--font-ui)', fontSize: '0.875rem' }}>Log out</button>
-              </SignOutButton>
+            <div>
+              <div className="home-btn-row">
+                <button
+                  onClick={handlePurchase}
+                  disabled={purchasing}
+                  className="btn-teal"
+                  style={{ opacity: purchasing ? 0.7 : 1 }}
+                >
+                  {purchasing ? 'Redirecting…' : 'Purchase Certification'}
+                </button>
+                <Link to="/ceu" className="btn-secondary">Renew Certification (CEU)</Link>
+              </div>
+              <p style={{ marginTop: 'var(--sp-3)', textAlign: 'center' }}>
+                <SignOutButton>
+                  <button style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'var(--font-ui)', fontSize: '0.8rem', color: 'var(--text-muted)', textDecoration: 'underline' }}>Log out</button>
+                </SignOutButton>
+              </p>
             </div>
           )}
         </SignedIn>
@@ -1051,6 +1055,7 @@ function CeuPage() {
   if (!allowed) {
     return (
       <div className="exam-shell">
+        <Link to="/" className="page-back-link" style={{ display: 'inline-block', marginBottom: 'var(--sp-4)', color: 'var(--text-secondary)', fontWeight: 600, textDecoration: 'underline' }}>← Back to Home</Link>
         <h1 className="page-title" style={{ marginBottom: 'var(--sp-6)' }}>Certification Renewal (CEU)</h1>
         {expiresAt && <p style={{ fontFamily: 'var(--font-ui)', color: 'var(--color-muted)', marginBottom: 'var(--sp-4)' }}>Current Expiration: {expiresAt}</p>}
         <div className="info-panel info-panel--notice" style={{ marginTop: 'var(--sp-6)' }}>
