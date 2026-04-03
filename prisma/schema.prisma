@@ -18,8 +18,9 @@ model User {
 }
 
 model PaidUser {
-  clerkUserId String   @id
-  paidAt      DateTime @default(now())
+  clerkUserId    String    @id
+  paidAt         DateTime  @default(now())
+  ceuAccessUntil DateTime? // set when CEU payment completes for external users; null = no active window
 }
 
 model Certification {

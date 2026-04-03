@@ -363,6 +363,7 @@ function HomePage() {
   }
 
   return (
+    <>
     <div className="home-shell">
       <header className="home-brand">
         <h1>Workplace Compliance Institute</h1>
@@ -406,7 +407,16 @@ function HomePage() {
           <Link to="/verify">Verify a Certificate</Link>
         </p>
       </main>
+
     </div>
+
+      <footer style={{ position: 'fixed', bottom: 'var(--sp-4)', left: 0, width: '100%', textAlign: 'center', pointerEvents: 'none' }}>
+        <Link to="/admin/sign-in" style={{ fontFamily: 'var(--font-ui)', fontSize: '0.75rem', color: 'var(--text-muted)', textDecoration: 'none', pointerEvents: 'auto' }}
+          onMouseEnter={e => (e.currentTarget.style.textDecoration = 'underline')}
+          onMouseLeave={e => (e.currentTarget.style.textDecoration = 'none')}
+        >Admin</Link>
+      </footer>
+    </>
   )
 }
 
@@ -420,6 +430,7 @@ function DashboardPage() {
   const quizzesPassed = ACTIVE_COURSE.sections.filter((s) => quizResults[s.id] === 'passed').length
 
   const [certId, setCertId] = useState<string | null>(null)
+  const [ceuStatusText, setCeuStatusText] = useState("")
 
   useEffect(() => {
     getToken().then((token) => {
@@ -431,8 +442,28 @@ function DashboardPage() {
     })
   }, [getToken])
 
+  useEffect(() => {
+    if (!user?.id) return
+    const base = import.meta.env.VITE_API_URL ?? ''
+    fetch(`${base}/payment-status?clerkUserId=${user.id}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (!data.ceuAccessUntil) return
+        const until = new Date(data.ceuAccessUntil)
+        const now = new Date()
+        if (until <= now) {
+          setCeuStatusText('CEU access expired — renew to continue')
+        } else {
+          const days = Math.ceil((until.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+          setCeuStatusText(`CEU access: ${days} day${days === 1 ? '' : 's'} remaining`)
+        }
+      })
+      .catch(() => {})
+  }, [user?.id])
+
   return (
     <div className="page-shell">
+      <Link to="/" className="page-back-link" style={{ color: 'var(--text-secondary)', fontWeight: 600, textDecoration: 'underline', marginBottom: '12px' }}>← Back to Home</Link>
       <div className="dash-header">
         <h1 className="dash-title">Dashboard</h1>
         <p className="dash-meta">{user?.primaryEmailAddress?.emailAddress}</p>
@@ -442,7 +473,7 @@ function DashboardPage() {
 
       <div
         className="info-panel info-panel--warm info-panel--featured"
-        style={{ marginBottom: 'var(--sp-6)' }}
+        style={{ marginBottom: ceuStatusText ? 'var(--sp-3)' : 'var(--sp-6)' }}
       >
         <p className="info-panel__title">EEO Investigator Certification</p>
         <p className="dash-course-desc">
@@ -456,13 +487,10 @@ function DashboardPage() {
         </p>
       </div>
 
+      {ceuStatusText && <p style={{ fontFamily: 'var(--font-ui)', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>{ceuStatusText}</p>}
       <div className="action-row">
         <Link to="/course" className="link-btn">View Course</Link>
-        {certId && (
-          <Link to={`/ceu?certId=${certId}&type=dashboard`} className="btn-primary">
-            Renew Certification
-          </Link>
-        )}
+        <Link to="/ceu" className="btn-primary">Renew Certification</Link>
         <SignOutButton />
       </div>
     </div>
@@ -989,6 +1017,8 @@ function CeuPage() {
   const { getToken } = useAuth()
   const [searchParams] = useSearchParams()
   const certId = searchParams.get('certId')
+  const returnType = searchParams.get('type')
+  const justPaid = returnType === 'paid'
 
   const [accessChecked, setAccessChecked] = useState(false)
   const [allowed, setAllowed] = useState(false)
@@ -1004,16 +1034,15 @@ function CeuPage() {
   }, [getToken])
 
   useEffect(() => {
-    if (!certId) { setAccessChecked(true); return }
+    if (justPaid) { setAllowed(true); setAccessChecked(true); return }
+    const url = certId ? `/ceu-access?certId=${encodeURIComponent(certId)}` : '/ceu-access'
     getToken().then((token) => {
-      fetch(`/ceu-access?certId=${encodeURIComponent(certId)}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
+      fetch(url, { headers: { Authorization: `Bearer ${token}` } })
         .then((r) => r.json())
         .then((data) => { setAllowed(!!data.allowed); setAccessChecked(true) })
         .catch(() => setAccessChecked(true))
     })
-  }, [certId, getToken])
+  }, [certId, justPaid, getToken])
 
   const [currentIndex, setCurrentIndex] = useState(0)
   const [answers, setAnswers] = useState<(number | null)[]>(
@@ -1038,12 +1067,15 @@ function CeuPage() {
             className="btn-primary"
             onClick={async () => {
               const token = await getToken()
-              const res = await fetch('/create-ceu-checkout-session', {
+              const base = import.meta.env.VITE_API_URL ?? ''
+              const res = await fetch(`${base}/create-ceu-checkout-session`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
                 body: JSON.stringify({ certId }),
               })
-              const data = await res.json()
+              const text = await res.text()
+              let data: any = {}
+              try { data = JSON.parse(text) } catch { /* non-JSON error response */ }
               if (data.url) window.location.href = data.url
             }}
           >
@@ -1159,8 +1191,8 @@ function CeuPage() {
             ).length
             const passed = correct / CEU_QUESTIONS.length >= 0.8
 
-            if (passed && certId && user?.id) {
-              // Trigger CEU renewal on pass
+            if (passed && user?.id) {
+              // Trigger CEU renewal on pass (certId may be null for external users)
               try {
                 await fetch('/ceu-complete', {
                   method: 'POST',
@@ -1551,7 +1583,7 @@ export default function App() {
     >
       <Routes>
         <Route path="/" element={<HomePage />} />
-        <Route path="/sign-in/*" element={<SignIn routing="path" path="/sign-in" />} />
+        <Route path="/sign-in/*" element={<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 'var(--sp-10)' }}><div style={{ width: 'fit-content' }}><Link to="/" className="page-back-link" style={{ display: 'inline-block', marginBottom: '12px', color: 'var(--text-secondary)', fontWeight: 600, textDecoration: 'underline' }}>← Back to Home</Link><SignIn routing="path" path="/sign-in" /></div></div>} />
         <Route path="/sign-up/*" element={<SignUp routing="path" path="/sign-up" />} />
         <Route path="/dashboard" element={<ProtectedDashboard />} />
         <Route path="/course" element={<ProtectedCourse />} />
