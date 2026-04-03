@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "start": "node server.js",
+    "start": "if [ -n \"$DATABASE_URL\" ]; then npx prisma migrate deploy; fi && node server.js",
     "lint": "eslint .",
     "preview": "vite preview",
     "postinstall": "prisma generate"

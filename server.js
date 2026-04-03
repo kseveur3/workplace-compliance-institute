@@ -15,7 +15,7 @@ const PORT = process.env.PORT || 3000;
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 const pool = new pg.Pool({
-  connectionString: process.env.DATABASE_URL?.replace(/[?&]sslmode=require\b/, ""),
+  connectionString: process.env.DATABASE_URL?.replace(/[?&]sslmode=require\b/, "").replace(/[?&]channel_binding=require\b/, ""),
   ssl: { rejectUnauthorized: false },
 });
 const adapter = new PrismaPg(pool);
@@ -65,22 +65,30 @@ app.post(
       if (session.metadata?.productType === "ceu") {
         // CEU renewal payment: unlock the exam for the specific certification.
         const { certId } = session.metadata;
-        if (!certId) {
-          console.error("CEU webhook missing certId:", session.id);
-          return res.status(400).json({ error: "Missing certId in metadata" });
+        if (certId) {
+          const ceuCert = await prisma.certification.findFirst({
+            where: { id: certId, clerkUserId },
+          });
+          if (!ceuCert) {
+            console.error("CEU webhook: cert not found or ownership mismatch:", certId);
+            return res.status(400).json({ error: "Certification not found" });
+          }
+          await prisma.certification.update({
+            where: { id: certId },
+            data: { ceuPaidAt: new Date() },
+          });
+          console.log("CEU payment recorded for cert:", certId, "user:", clerkUserId);
+        } else {
+          // External user without a certId: grant 30-day CEU access window via PaidUser.
+          const ceuAccessUntil = new Date();
+          ceuAccessUntil.setDate(ceuAccessUntil.getDate() + 30);
+          await prisma.paidUser.upsert({
+            where: { clerkUserId },
+            create: { clerkUserId, ceuAccessUntil },
+            update: { ceuAccessUntil },
+          });
+          console.log("CEU 30-day access granted for external user:", clerkUserId, "until:", ceuAccessUntil);
         }
-        const ceuCert = await prisma.certification.findFirst({
-          where: { id: certId, clerkUserId },
-        });
-        if (!ceuCert) {
-          console.error("CEU webhook: cert not found or ownership mismatch:", certId);
-          return res.status(400).json({ error: "Certification not found" });
-        }
-        await prisma.certification.update({
-          where: { id: certId },
-          data: { ceuPaidAt: new Date() },
-        });
-        console.log("CEU payment recorded for cert:", certId, "user:", clerkUserId);
       } else {
         // Full certification purchase.
         await prisma.paidUser.upsert({
@@ -141,25 +149,36 @@ app.post("/create-ceu-checkout-session", clerkMiddleware(), async (req, res) => 
   }
 
   const { certId } = req.body;
-  if (!certId) {
-    return res.status(400).json({ error: "certId is required" });
-  }
 
-  const cert = await prisma.certification.findFirst({
-    where: { id: certId, clerkUserId },
-  });
-  if (!cert) {
-    return res.status(404).json({ error: "Certification not found" });
+  try {
+    if (certId) {
+      const cert = await prisma.certification.findFirst({
+        where: { id: certId, clerkUserId },
+      });
+      if (!cert) {
+        return res.status(404).json({ error: "Certification not found" });
+      }
+    }
+  } catch (err) {
+    console.error("[/create-ceu-checkout-session] DB error:", err.message);
+    return res.status(500).json({ error: "Failed to verify certification" });
   }
 
   const CLIENT_URL = process.env.CLIENT_URL || "http://localhost:5173";
+  const successUrl = certId
+    ? `${CLIENT_URL}/ceu?certId=${certId}&type=paid`
+    : `${CLIENT_URL}/ceu?type=paid`;
+  const cancelUrl = certId
+    ? `${CLIENT_URL}/ceu?certId=${certId}&type=cancel`
+    : `${CLIENT_URL}/ceu?type=cancel`;
+
   try {
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       line_items: [{ price: process.env.STRIPE_CEU_PRICE_ID, quantity: 1 }],
-      success_url: `${CLIENT_URL}/ceu?certId=${certId}&type=paid`,
-      cancel_url: `${CLIENT_URL}/ceu?certId=${certId}&type=cancel`,
-      metadata: { clerkUserId, certId, productType: "ceu" },
+      success_url: successUrl,
+      cancel_url: cancelUrl,
+      metadata: { clerkUserId, certId: certId ?? "", productType: "ceu" },
     });
     res.json({ url: session.url });
   } catch (err) {
@@ -177,26 +196,31 @@ app.post("/ceu-complete", clerkMiddleware(), async (req, res) => {
   }
 
   const { certId } = req.body;
-  if (!certId) {
-    return res.status(400).json({ success: false, error: "certId is required" });
+
+  try {
+    if (certId) {
+      const cert = await prisma.certification.findFirst({
+        where: { id: certId, clerkUserId },
+      });
+
+      if (!cert) {
+        return res.status(404).json({ success: false, error: "Certification not found" });
+      }
+
+      const issuedAt = new Date();
+      const expiresAt = new Date(cert.expiresAt);
+      expiresAt.setFullYear(expiresAt.getFullYear() + 1);
+
+      await prisma.certification.update({
+        where: { id: certId },
+        data: { renewedAt: issuedAt, issuedAt, expiresAt, ceuPaidAt: null },
+      });
+    }
+    // External user without certId: leave the 30-day CEU window active until it expires.
+  } catch (err) {
+    console.error("[/ceu-complete]", err.message);
+    return res.status(500).json({ success: false, error: "Failed to record renewal" });
   }
-
-  const cert = await prisma.certification.findFirst({
-    where: { id: certId, clerkUserId },
-  });
-
-  if (!cert) {
-    return res.status(404).json({ success: false, error: "Certification not found" });
-  }
-
-  const issuedAt = new Date();
-  const expiresAt = new Date(cert.expiresAt);
-  expiresAt.setFullYear(expiresAt.getFullYear() + 1);
-
-  await prisma.certification.update({
-    where: { id: certId },
-    data: { renewedAt: issuedAt, issuedAt, expiresAt, ceuPaidAt: null },
-  });
 
   return res.json({ success: true });
 });
@@ -209,13 +233,21 @@ app.get("/ceu-access", clerkMiddleware(), async (req, res) => {
     return res.status(401).json({ allowed: false });
   }
   const { certId } = req.query;
-  if (!certId || typeof certId !== "string") {
-    return res.status(400).json({ allowed: false });
+  try {
+    if (certId && typeof certId === "string") {
+      const cert = await prisma.certification.findFirst({
+        where: { id: certId, clerkUserId, ceuPaidAt: { not: null } },
+      });
+      return res.json({ allowed: !!cert });
+    }
+    // External user without certId: check 30-day CEU window on PaidUser.
+    const record = await prisma.paidUser.findUnique({ where: { clerkUserId } });
+    const allowed = !!(record?.ceuAccessUntil && record.ceuAccessUntil > new Date());
+    res.json({ allowed });
+  } catch (err) {
+    console.error("[/ceu-access]", err.message);
+    res.status(500).json({ allowed: false });
   }
-  const cert = await prisma.certification.findFirst({
-    where: { id: certId, clerkUserId, ceuPaidAt: { not: null } },
-  });
-  res.json({ allowed: !!cert });
 });
 
 // ── Payment status — server-side source of truth ──────────────────────────────
@@ -228,7 +260,7 @@ app.get("/payment-status", async (req, res) => {
     const record = await prisma.paidUser.findUnique({
       where: { clerkUserId },
     });
-    res.json({ paid: !!record });
+    res.json({ paid: !!record, ceuAccessUntil: record?.ceuAccessUntil ?? null });
   } catch (err) {
     console.error("[/payment-status]", err);
     res.status(500).json({ error: "payment-status failed" });
@@ -267,12 +299,17 @@ app.get("/my-certification", clerkMiddleware(), async (req, res) => {
   if (!clerkUserId) {
     return res.status(401).json({ error: "Unauthorized" });
   }
-  const cert = await prisma.certification.findFirst({
-    where: { clerkUserId },
-    orderBy: { createdAt: "desc" },
-    select: { id: true, issuedAt: true, expiresAt: true, renewedAt: true },
-  });
-  res.json(cert ?? null);
+  try {
+    const cert = await prisma.certification.findFirst({
+      where: { clerkUserId },
+      orderBy: { createdAt: "desc" },
+      select: { id: true, issuedAt: true, expiresAt: true, renewedAt: true },
+    });
+    res.json(cert ?? null);
+  } catch (err) {
+    console.error("[/my-certification]", err.message);
+    res.status(500).json({ error: "Failed to load certification" });
+  }
 });
 
 // ── Admin: Generate full certification (mock) ────────────────────────────────
