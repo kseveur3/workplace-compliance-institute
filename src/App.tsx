@@ -319,6 +319,8 @@ interface CompletionContextValue {
   finalExamResult: QuizResult | null
   setFinalExamResult: (result: QuizResult) => void
   paid: boolean
+  // courseAccessActive: server-authoritative 60-day course access signal
+  courseAccessActive: boolean
   paidLoading: boolean
   refetchPaidStatus: () => void
 }
@@ -331,6 +333,7 @@ const CompletionContext = createContext<CompletionContextValue>({
   finalExamResult: null,
   setFinalExamResult: () => {},
   paid: false,
+  courseAccessActive: false,
   paidLoading: true,
   refetchPaidStatus: () => {},
 })
@@ -452,7 +455,8 @@ function EeoDetailPage() {
         {/* ── Section 1: Get Certified ── */}
         <div style={{ marginBottom: 'var(--sp-8)' }}>
           <h3 style={{ fontFamily: 'var(--font-ui)', fontSize: '1rem', fontWeight: 600, marginBottom: 'var(--sp-1)', color: 'var(--text-primary)' }}>Get Certified</h3>
-          <p style={{ fontFamily: 'var(--font-ui)', fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: 'var(--sp-3)' }}>Complete the full training and final exam to earn your certification.</p>
+          <p style={{ fontFamily: 'var(--font-ui)', fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: 'var(--sp-1)' }}>Complete the full training and final exam to earn your certification.</p>
+          <p style={{ fontFamily: 'var(--font-ui)', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 'var(--sp-3)' }}>Course access is valid for 60 days from purchase. Certification is valid for 1 year after passing the final exam.</p>
           <SignedOut>
             <div className="home-btn-row">
               <Link to="/sign-up" className="btn-primary">Start Certification</Link>
@@ -542,6 +546,15 @@ function certStatusText(certification: ExamEntry['certification']): string {
   return `Certification active until ${expires.toLocaleDateString()}${renewed}`
 }
 
+function courseAccessText(purchasedAt: string): string {
+  const expiry = new Date(purchasedAt)
+  expiry.setDate(expiry.getDate() + 60)
+  const now = new Date()
+  if (expiry <= now) return 'Course access expired'
+  const days = Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+  return `Course access: ${days} day${days === 1 ? '' : 's'} remaining`
+}
+
 function DashboardPage() {
   const { user } = useUser()
   const { getToken } = useAuth()
@@ -573,9 +586,10 @@ function DashboardPage() {
       <hr className="dash-divider" />
 
       {myExams.map((exam) => {
+        const isEeo = exam.examSlug === COURSE.id
         const ceuText = ceuStatusText(exam.ceuAccessUntil)
         const certText = certStatusText(exam.certification)
-        const isEeo = exam.examSlug === COURSE.id
+        const accessText = isEeo ? courseAccessText(exam.purchasedAt) : ''
 
         return (
           <div key={exam.examId}>
@@ -591,6 +605,7 @@ function DashboardPage() {
                 </p>
               )}
               {certText && <p className="dash-course-progress">{certText}</p>}
+              {accessText && <p className="dash-course-progress">{accessText}</p>}
               {isEeo && (
                 <p className="dash-course-progress">
                   {completed.size} of {totalLessons} lessons completed
@@ -1546,6 +1561,44 @@ function PaidGuard({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
+// Course routes now enforce the 60-day full-course access window.
+// Reads courseAccessActive from CompletionContext (sourced from /payment-status).
+function CourseAccessGuard({ children }: { children: React.ReactNode }) {
+  const { courseAccessActive, paidLoading } = useCompletion()
+  const { isLoaded: clerkLoaded, isSignedIn } = useUser()
+  if (DEV_BYPASS_PAID_GUARD) return <>{children}</>
+  if (!clerkLoaded || !isSignedIn || paidLoading) return null
+  if (!courseAccessActive) return <Navigate to="/" replace />
+  return <>{children}</>
+}
+
+// Certificate access remains tied to certification validity, independent of course access window.
+// Allows access when course access is still active OR when the user holds a valid certification.
+function CertAccessGuard({ children }: { children: React.ReactNode }) {
+  const { courseAccessActive, paidLoading } = useCompletion()
+  const { isLoaded: clerkLoaded, isSignedIn } = useUser()
+  const { getToken } = useAuth()
+  const [certActive, setCertActive] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    if (!clerkLoaded || !isSignedIn) return
+    getToken().then((token) => {
+      const base = import.meta.env.VITE_API_URL ?? ''
+      fetch(`${base}/my-certification`, { headers: { Authorization: `Bearer ${token}` } })
+        .then((r) => r.json())
+        .then((data) => {
+          setCertActive(!!(data?.expiresAt && new Date(data.expiresAt) > new Date()))
+        })
+        .catch(() => setCertActive(false))
+    })
+  }, [clerkLoaded, isSignedIn, getToken])
+
+  if (DEV_BYPASS_PAID_GUARD) return <>{children}</>
+  if (!clerkLoaded || !isSignedIn || paidLoading || certActive === null) return null
+  if (!courseAccessActive && !certActive) return <Navigate to="/" replace />
+  return <>{children}</>
+}
+
 // Dashboard access is now based on owned exams, not the legacy single-exam paid flag.
 // Fetches /my-exams and allows access when the user owns at least one exam.
 function OwnedExamsGuard({ children }: { children: React.ReactNode }) {
@@ -1581,7 +1634,7 @@ function ProtectedDashboard() {
 function ProtectedCourse() {
   return (
     <>
-      <SignedIn><PaidGuard><CoursePage /></PaidGuard></SignedIn>
+      <SignedIn><CourseAccessGuard><CoursePage /></CourseAccessGuard></SignedIn>
       <SignedOut><Navigate to="/sign-in" replace /></SignedOut>
     </>
   )
@@ -1590,7 +1643,7 @@ function ProtectedCourse() {
 function ProtectedLesson() {
   return (
     <>
-      <SignedIn><PaidGuard><LessonPage /></PaidGuard></SignedIn>
+      <SignedIn><CourseAccessGuard><LessonPage /></CourseAccessGuard></SignedIn>
       <SignedOut><Navigate to="/sign-in" replace /></SignedOut>
     </>
   )
@@ -1599,7 +1652,7 @@ function ProtectedLesson() {
 function ProtectedQuiz() {
   return (
     <>
-      <SignedIn><PaidGuard><QuizPage /></PaidGuard></SignedIn>
+      <SignedIn><CourseAccessGuard><QuizPage /></CourseAccessGuard></SignedIn>
       <SignedOut><Navigate to="/sign-in" replace /></SignedOut>
     </>
   )
@@ -1608,7 +1661,7 @@ function ProtectedQuiz() {
 function ProtectedFinalExam() {
   return (
     <>
-      <SignedIn><PaidGuard><FinalExamPage /></PaidGuard></SignedIn>
+      <SignedIn><CourseAccessGuard><FinalExamPage /></CourseAccessGuard></SignedIn>
       <SignedOut><Navigate to="/sign-in" replace /></SignedOut>
     </>
   )
@@ -1617,7 +1670,7 @@ function ProtectedFinalExam() {
 function ProtectedCertificate() {
   return (
     <>
-      <SignedIn><PaidGuard><CertificatePage /></PaidGuard></SignedIn>
+      <SignedIn><CertAccessGuard><CertificatePage /></CertAccessGuard></SignedIn>
       <SignedOut><Navigate to="/sign-in" replace /></SignedOut>
     </>
   )
@@ -1635,6 +1688,7 @@ export default function App() {
   const [quizResults, setQuizResults] = useState<Record<string, QuizResult>>({})
   const [finalExamResult, setFinalExamResultState] = useState<QuizResult | null>(null)
   const [paid, setPaidState] = useState<boolean>(false)
+  const [courseAccessActive, setCourseAccessActive] = useState<boolean>(false)
   const [paidLoading, setPaidLoading] = useState<boolean>(true)
 
   useEffect(() => {
@@ -1644,6 +1698,7 @@ export default function App() {
       setQuizResults({})
       setFinalExamResultState(null)
       setPaidState(false)
+      setCourseAccessActive(false)
       setPaidLoading(false)
       return
     }
@@ -1671,11 +1726,16 @@ export default function App() {
     setPaidLoading(true)
     fetch(`${base}/payment-status?clerkUserId=${uid}`, { signal })
       .then((res) => { if (!res.ok) throw new Error(`${res.status}`); return res.json() })
-      .then((data) => { setPaidState(data.paid === true); setPaidLoading(false) })
+      .then((data) => {
+        setPaidState(data.paid === true)
+        setCourseAccessActive(data.courseAccessActive === true)
+        setPaidLoading(false)
+      })
       .catch((err) => {
         if (err.name === 'AbortError') return
         // Network error: fall back to localStorage so the app stays usable offline
         setPaidState(localStorage.getItem(`wci_paid_user_${uid}`) === 'true')
+        setCourseAccessActive(false)
         setPaidLoading(false)
       })
   }
@@ -1720,6 +1780,7 @@ export default function App() {
         finalExamResult,
         setFinalExamResult,
         paid,
+        courseAccessActive,
         paidLoading,
         refetchPaidStatus,
       }}

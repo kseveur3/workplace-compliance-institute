@@ -370,7 +370,14 @@ app.get("/payment-status", async (req, res) => {
     // paid = true only for full certification purchase (ceuAccessUntil is null).
     // CEU-only external users have ceuAccessUntil set and do not get full course access.
     const paid = !!(record && record.ceuAccessUntil === null);
-    res.json({ paid, ceuAccessUntil: record?.ceuAccessUntil ?? null });
+    // courseAccessActive: server-authoritative 60-day course access rule.
+    // True only when the user has a full-cert purchase and it is within 60 days of purchasedAt.
+    const COURSE_ACCESS_DAYS = 60;
+    const courseAccessActive =
+      paid &&
+      !!record?.purchasedAt &&
+      Date.now() < new Date(record.purchasedAt).getTime() + COURSE_ACCESS_DAYS * 24 * 60 * 60 * 1000;
+    res.json({ paid, courseAccessActive, ceuAccessUntil: record?.ceuAccessUntil ?? null });
   } catch (err) {
     console.error("[/payment-status]", err);
     res.status(500).json({ error: "payment-status failed" });
