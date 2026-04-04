@@ -370,7 +370,14 @@ app.get("/payment-status", async (req, res) => {
     // paid = true only for full certification purchase (ceuAccessUntil is null).
     // CEU-only external users have ceuAccessUntil set and do not get full course access.
     const paid = !!(record && record.ceuAccessUntil === null);
-    res.json({ paid, ceuAccessUntil: record?.ceuAccessUntil ?? null });
+    // courseAccessActive: server-authoritative 60-day course access rule.
+    // True only when the user has a full-cert purchase and it is within 60 days of purchasedAt.
+    const COURSE_ACCESS_DAYS = 60;
+    const courseAccessActive =
+      paid &&
+      !!record?.purchasedAt &&
+      Date.now() < new Date(record.purchasedAt).getTime() + COURSE_ACCESS_DAYS * 24 * 60 * 60 * 1000;
+    res.json({ paid, courseAccessActive, ceuAccessUntil: record?.ceuAccessUntil ?? null });
   } catch (err) {
     console.error("[/payment-status]", err);
     res.status(500).json({ error: "payment-status failed" });
@@ -413,12 +420,98 @@ app.get("/my-certification", clerkMiddleware(), async (req, res) => {
   try {
     const cert = await prisma.userCertification.findUnique({
       where: { clerkUserId_examId: { clerkUserId, examId: EEO_EXAM.id } },
-      select: { issuedAt: true, expiresAt: true, renewedAt: true },
+      select: { issuedAt: true, expiresAt: true, renewedAt: true, fullName: true },
     });
     res.json(cert ?? null);
   } catch (err) {
     console.error("[/my-certification]", err.message);
     res.status(500).json({ error: "Failed to load certification" });
+  }
+});
+
+// ── Final exam completion → durable certification issuance ───────────────────
+// Called by the frontend when the user scores ≥80% on the final exam.
+// Verifies ExamAccess (purchase) exists, then upserts UserCertification.
+// Idempotent: retries produce the same row, not duplicates.
+// fullName is required — captured by the name modal before the exam starts.
+app.post("/complete-exam", clerkMiddleware(), async (req, res) => {
+  const { userId: clerkUserId } = getAuth(req);
+  if (!clerkUserId) return res.status(401).json({ error: "Unauthorized" });
+
+  const { fullName } = req.body;
+  if (!fullName || typeof fullName !== "string" || !fullName.trim()) {
+    return res.status(400).json({ error: "fullName is required" });
+  }
+
+  try {
+    // Verify the user has a purchase — prevents fabricated completion calls.
+    const access = await prisma.examAccess.findUnique({
+      where: { clerkUserId_examId: { clerkUserId, examId: EEO_EXAM.id } },
+    });
+    if (!access) {
+      return res.status(403).json({ error: "No exam access found for this user" });
+    }
+
+    const issuedAt = new Date();
+    const expiresAt = new Date(issuedAt);
+    expiresAt.setFullYear(expiresAt.getFullYear() + 1);
+
+    // Upsert: safe to retry. On re-completion we refresh issuedAt, expiresAt,
+    // and fullName so a name correction before retaking the exam takes effect.
+    await prisma.userCertification.upsert({
+      where: { clerkUserId_examId: { clerkUserId, examId: EEO_EXAM.id } },
+      create: {
+        clerkUserId,
+        examId: EEO_EXAM.id,
+        fullName: fullName.trim(),
+        issuedAt,
+        expiresAt,
+      },
+      update: {
+        fullName: fullName.trim(),
+        issuedAt,
+        expiresAt,
+      },
+    });
+
+    console.log(`[/complete-exam] Certification issued for ${clerkUserId}`);
+    res.json({ issued: true, issuedAt, expiresAt });
+  } catch (err) {
+    console.error("[/complete-exam]", err.message);
+    res.status(500).json({ error: "Failed to issue certification" });
+  }
+});
+
+// ── Save certificate full name ────────────────────────────────────────────────
+// Persists the name the user wants printed on their certificate.
+// If UserCertification exists (backfilled users), updates it immediately.
+// If not (pre-exam first-time users), returns 202 — the frontend stores the
+// name in localStorage and the certificate page uses that as fallback.
+app.post("/set-full-name", clerkMiddleware(), async (req, res) => {
+  const { userId: clerkUserId } = getAuth(req);
+  if (!clerkUserId) return res.status(401).json({ error: "Unauthorized" });
+
+  const { fullName } = req.body;
+  if (!fullName || typeof fullName !== "string" || !fullName.trim()) {
+    return res.status(400).json({ error: "fullName is required" });
+  }
+
+  try {
+    const existing = await prisma.userCertification.findUnique({
+      where: { clerkUserId_examId: { clerkUserId, examId: EEO_EXAM.id } },
+    });
+    if (existing) {
+      await prisma.userCertification.update({
+        where: { clerkUserId_examId: { clerkUserId, examId: EEO_EXAM.id } },
+        data: { fullName: fullName.trim() },
+      });
+      return res.json({ stored: true });
+    }
+    // No UserCertification yet — frontend localStorage is the source of truth for now.
+    res.status(202).json({ stored: false });
+  } catch (err) {
+    console.error("[/set-full-name]", err.message);
+    res.status(500).json({ error: "Failed to save full name" });
   }
 });
 

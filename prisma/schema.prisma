@@ -72,6 +72,7 @@ model UserCertification {
   examId      String
   exam        Exam      @relation(fields: [examId], references: [id])
 
+  fullName    String?   // name to print on the certificate; null for records pre-dating this field
   issuedAt    DateTime
   expiresAt   DateTime
   renewedAt   DateTime?

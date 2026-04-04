@@ -263,6 +263,11 @@ button {
   font-weight: 600;
 }
 
+.status-bar a.btn-primary,
+.status-bar a.btn-primary:hover {
+  color: var(--text-inverse);
+}
+
 .status-bar button:disabled {
   opacity: 0.4;
   cursor: not-allowed;
@@ -1089,6 +1094,67 @@ button {
   font-family: var(--font-ui);
   color: var(--text-secondary);
   margin-bottom: var(--sp-8);
+}
+
+/* ── Name capture modal ─────────────────── */
+.name-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+}
+
+.name-modal {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: var(--sp-8);
+  max-width: 420px;
+  width: calc(100% - var(--sp-8));
+  box-shadow: var(--shadow-md);
+}
+
+.name-modal__title {
+  font-family: var(--font-ui);
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 var(--sp-2);
+}
+
+.name-modal__desc {
+  font-family: var(--font-ui);
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin: 0 0 var(--sp-5);
+}
+
+.name-modal__input {
+  width: 100%;
+  box-sizing: border-box;
+  font-family: var(--font-ui);
+  font-size: 0.875rem;
+  color: var(--text-primary);
+  background: var(--bg);
+  border: 1.5px solid var(--border);
+  border-radius: var(--r-md);
+  padding: var(--sp-3) var(--sp-4);
+  margin-bottom: var(--sp-5);
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.name-modal__input:focus {
+  border-color: var(--navy);
+}
+
+.name-modal__actions {
+  display: flex;
+  gap: var(--sp-3);
+  justify-content: flex-end;
 }
 
 /* ── Print ───────────────────────────────── */

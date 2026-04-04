@@ -1,4 +1,4 @@
-import { useState, useEffect, createContext, useContext } from 'react'
+import { useState, useEffect, useRef, createContext, useContext } from 'react'
 import { AdminAiContentPage } from './pages/admin-ai-content'
 import { Routes, Route, Link, Navigate, useParams, useNavigate, useLocation, useSearchParams } from 'react-router-dom'
 import { SignIn, SignUp, SignedIn, SignedOut, SignOutButton, useUser, useAuth } from '@clerk/clerk-react'
@@ -319,6 +319,8 @@ interface CompletionContextValue {
   finalExamResult: QuizResult | null
   setFinalExamResult: (result: QuizResult) => void
   paid: boolean
+  // courseAccessActive: server-authoritative 60-day course access signal
+  courseAccessActive: boolean
   paidLoading: boolean
   refetchPaidStatus: () => void
 }
@@ -331,6 +333,7 @@ const CompletionContext = createContext<CompletionContextValue>({
   finalExamResult: null,
   setFinalExamResult: () => {},
   paid: false,
+  courseAccessActive: false,
   paidLoading: true,
   refetchPaidStatus: () => {},
 })
@@ -452,7 +455,8 @@ function EeoDetailPage() {
         {/* ── Section 1: Get Certified ── */}
         <div style={{ marginBottom: 'var(--sp-8)' }}>
           <h3 style={{ fontFamily: 'var(--font-ui)', fontSize: '1rem', fontWeight: 600, marginBottom: 'var(--sp-1)', color: 'var(--text-primary)' }}>Get Certified</h3>
-          <p style={{ fontFamily: 'var(--font-ui)', fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: 'var(--sp-3)' }}>Complete the full training and final exam to earn your certification.</p>
+          <p style={{ fontFamily: 'var(--font-ui)', fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: 'var(--sp-1)' }}>Complete the full training and final exam to earn your certification.</p>
+          <p style={{ fontFamily: 'var(--font-ui)', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 'var(--sp-3)' }}>Course access is valid for 60 days from purchase. Certification is valid for 1 year after passing the final exam.</p>
           <SignedOut>
             <div className="home-btn-row">
               <Link to="/sign-up" className="btn-primary">Start Certification</Link>
@@ -542,6 +546,15 @@ function certStatusText(certification: ExamEntry['certification']): string {
   return `Certification active until ${expires.toLocaleDateString()}${renewed}`
 }
 
+function courseAccessText(purchasedAt: string): string {
+  const expiry = new Date(purchasedAt)
+  expiry.setDate(expiry.getDate() + 60)
+  const now = new Date()
+  if (expiry <= now) return 'Course access expired'
+  const days = Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+  return `Course access: ${days} day${days === 1 ? '' : 's'} remaining`
+}
+
 function DashboardPage() {
   const { user } = useUser()
   const { getToken } = useAuth()
@@ -573,9 +586,10 @@ function DashboardPage() {
       <hr className="dash-divider" />
 
       {myExams.map((exam) => {
+        const isEeo = exam.examSlug === COURSE.id
         const ceuText = ceuStatusText(exam.ceuAccessUntil)
         const certText = certStatusText(exam.certification)
-        const isEeo = exam.examSlug === COURSE.id
+        const accessText = isEeo ? courseAccessText(exam.purchasedAt) : ''
 
         return (
           <div key={exam.examId}>
@@ -591,6 +605,7 @@ function DashboardPage() {
                 </p>
               )}
               {certText && <p className="dash-course-progress">{certText}</p>}
+              {accessText && <p className="dash-course-progress">{accessText}</p>}
               {isEeo && (
                 <p className="dash-course-progress">
                   {completed.size} of {totalLessons} lessons completed
@@ -624,6 +639,9 @@ const TOTAL_LESSONS = ACTIVE_COURSE.sections.reduce((sum, s) => sum + s.lessons.
 
 function CoursePage() {
   const { completed, quizResults, finalExamResult } = useCompletion()
+  const { user } = useUser()
+  const { getToken } = useAuth()
+  const navigate = useNavigate()
   const location = useLocation()
   const quizSummary = (
     location.state as {
@@ -640,7 +658,46 @@ function CoursePage() {
   const allQuizzesPassed = ACTIVE_COURSE.sections.every((s) => quizResults[s.id] === 'passed')
   const eligible = allLessonsDone && allQuizzesPassed
 
+  const [showNameModal, setShowNameModal] = useState(false)
+  const [nameInput, setNameInput] = useState('')
+  const [nameSaving, setNameSaving] = useState(false)
+
+  function handleFinalExamClick() {
+    const uid = user?.id
+    const stored = uid ? localStorage.getItem(`wci_cert_name_${uid}`) : null
+    if (stored) {
+      navigate('/final-exam')
+    } else {
+      setShowNameModal(true)
+    }
+  }
+
+  async function handleNameSave() {
+    const trimmed = nameInput.trim()
+    if (!trimmed) return
+    setNameSaving(true)
+    const uid = user?.id
+    if (uid) {
+      localStorage.setItem(`wci_cert_name_${uid}`, trimmed)
+    }
+    try {
+      const token = await getToken()
+      const base = import.meta.env.VITE_API_URL ?? ''
+      await fetch(`${base}/set-full-name`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ fullName: trimmed }),
+      })
+    } catch {
+      // localStorage copy is the fallback; network failure is non-blocking
+    }
+    setNameSaving(false)
+    setShowNameModal(false)
+    navigate('/final-exam')
+  }
+
   return (
+    <>
     <div className="page-shell">
       <Link to="/dashboard" className="page-back-link">← Back to Dashboard</Link>
 
@@ -718,9 +775,9 @@ function CoursePage() {
             {eligible ? '✓ Certification Unlocked' : '⊘ Certification Locked'}
           </span>
           {eligible ? (
-            <Link to="/final-exam" className="btn-primary" style={{ fontSize: '0.75rem' }}>
+            <button className="btn-primary" style={{ fontSize: '0.75rem' }} onClick={handleFinalExamClick}>
               Take Final Exam
-            </Link>
+            </button>
           ) : (
             <button disabled className="btn-primary" style={{ fontSize: '0.75rem', opacity: 0.35, cursor: 'not-allowed' }}>
               Take Final Exam
@@ -770,6 +827,45 @@ function CoursePage() {
         )
       })}
     </div>
+
+    {showNameModal && (
+      <div className="name-modal-overlay">
+        <div className="name-modal">
+          <p className="name-modal__title">Enter your name for the certificate</p>
+          <p className="name-modal__desc">
+            This name will appear on your certificate exactly as entered.
+          </p>
+          <input
+            className="name-modal__input"
+            type="text"
+            placeholder="Full name"
+            value={nameInput}
+            onChange={(e) => setNameInput(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') handleNameSave() }}
+            autoFocus
+          />
+          <div className="name-modal__actions">
+            <button
+              className="btn-secondary"
+              style={{ fontSize: '0.8rem' }}
+              onClick={() => setShowNameModal(false)}
+              disabled={nameSaving}
+            >
+              Cancel
+            </button>
+            <button
+              className="btn-primary"
+              style={{ fontSize: '0.8rem' }}
+              onClick={handleNameSave}
+              disabled={!nameInput.trim() || nameSaving}
+            >
+              {nameSaving ? 'Saving…' : 'Continue to Exam'}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   )
 }
 
@@ -958,6 +1054,7 @@ const DEV_BYPASS_FINAL_EXAM = false // TODO: remove before production
 function FinalExamPage() {
   const { completed, quizResults, finalExamResult, setFinalExamResult } = useCompletion()
   const { user } = useUser()
+  const { getToken } = useAuth()
   const allLessonsDone = ALL_LESSONS.every((l) => completed.has(l.id))
   const allQuizzesPassed = ACTIVE_COURSE.sections.every((s) => quizResults[s.id] === 'passed')
   const eligible = DEV_BYPASS_FINAL_EXAM || (allLessonsDone && allQuizzesPassed)
@@ -967,6 +1064,8 @@ function FinalExamPage() {
     Array(ACTIVE_FINAL_EXAM.length).fill(null)
   )
   const [showResults, setShowResults] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [issuanceError, setIssuanceError] = useState(false)
 
   if (!eligible) {
     return (
@@ -1089,44 +1188,54 @@ function FinalExamPage() {
 
       <button
         className="quiz-submit"
-        disabled={selected === null}
-        onClick={() => {
+        disabled={selected === null || isSubmitting}
+        onClick={async () => {
           if (isLast) {
             const correct = answers.filter(
               (a, i) => a === ACTIVE_FINAL_EXAM[i].correctIndex
             ).length
             const passed = correct / ACTIVE_FINAL_EXAM.length >= 0.8
-            setFinalExamResult(passed ? 'passed' : 'failed')
-            if (passed) {
-              const email = user?.primaryEmailAddress?.emailAddress
-              if (email) {
-                const records: {
-                  email: string
-                  courseName: string
-                  completionDate: string
-                }[] = JSON.parse(
-                  localStorage.getItem('wci_certifications') || '[]'
-                )
-                const date = new Date().toLocaleDateString('en-US', {
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric',
-                })
-                const idx = records.findIndex((r) => r.email === email)
-                const record = { email, courseName: ACTIVE_COURSE.title, completionDate: date }
-                if (idx >= 0) records[idx] = record
-                else records.push(record)
-                localStorage.setItem('wci_certifications', JSON.stringify(records))
-              }
+
+            if (!passed) {
+              setFinalExamResult('failed')
+              setShowResults(true)
+              return
             }
-            setShowResults(true)
+
+            // Passed — issue certification server-side before marking locally.
+            setIsSubmitting(true)
+            setIssuanceError(false)
+            try {
+              const uid = user?.id
+              const fullName = (uid ? localStorage.getItem(`wci_cert_name_${uid}`) : null) ?? ''
+              const token = await getToken()
+              const base = import.meta.env.VITE_API_URL ?? ''
+              const res = await fetch(`${base}/complete-exam`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ fullName }),
+              })
+              if (!res.ok) throw new Error(`${res.status}`)
+              // Server confirmed — now mark locally and show results.
+              setFinalExamResult('passed')
+              setShowResults(true)
+            } catch {
+              setIssuanceError(true)
+            } finally {
+              setIsSubmitting(false)
+            }
           } else {
             setCurrentIndex((i) => i + 1)
           }
         }}
       >
-        {isLast ? 'Submit Exam' : 'Next Question'}
+        {isSubmitting ? 'Saving…' : isLast ? 'Submit Exam' : 'Next Question'}
       </button>
+      {issuanceError && (
+        <p style={{ fontFamily: 'var(--font-ui)', fontSize: '0.875rem', color: 'var(--color-error)', marginTop: 'var(--sp-4)' }}>
+          Something went wrong saving your result. Please try submitting again.
+        </p>
+      )}
     </div>
   )
 }
@@ -1350,10 +1459,43 @@ function ProtectedCeu() {
 function CertificatePage() {
   const { finalExamResult } = useCompletion()
   const { user } = useUser()
+  const { getToken } = useAuth()
+  const [certName, setCertName] = useState<string | null>(null)
+
+  useEffect(() => {
+    const uid = user?.id
+    // Try server first (backfilled users have UserCertification.fullName)
+    getToken().then((token) => {
+      const base = import.meta.env.VITE_API_URL ?? ''
+      fetch(`${base}/my-certification`, { headers: { Authorization: `Bearer ${token}` } })
+        .then((r) => r.json())
+        .then((data) => {
+          if (data?.fullName) {
+            setCertName(data.fullName)
+          } else {
+            // Fallback: localStorage (set before exam for new users)
+            const local = uid ? localStorage.getItem(`wci_cert_name_${uid}`) : null
+            setCertName(local ?? user?.primaryEmailAddress?.emailAddress ?? null)
+            // If we found a name in localStorage and the server record now exists, persist it
+            if (local && data !== null) {
+              fetch(`${base}/set-full-name`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ fullName: local }),
+              }).catch(() => {})
+            }
+          }
+        })
+        .catch(() => {
+          const local = uid ? localStorage.getItem(`wci_cert_name_${uid}`) : null
+          setCertName(local ?? user?.primaryEmailAddress?.emailAddress ?? null)
+        })
+    })
+  }, [user, getToken])
 
   if (finalExamResult !== 'passed') return <Navigate to="/course" replace />
 
-  const email = user?.primaryEmailAddress?.emailAddress ?? 'the participant'
+  const displayName = certName ?? user?.primaryEmailAddress?.emailAddress ?? 'the participant'
   const date = new Date().toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'long',
@@ -1376,7 +1518,7 @@ function CertificatePage() {
 
         <p className="certificate-presents">This certifies that</p>
 
-        <p className="certificate-name">{email}</p>
+        <p className="certificate-name">{displayName}</p>
 
         <p
           style={{
@@ -1480,31 +1622,65 @@ function VerifyPage() {
 
 // ─── Checkout Pages ───────────────────────────────────────────────────────────
 
+const POLL_INTERVAL_MS = 2000
+const POLL_TIMEOUT_MS = 30000
+
 function CheckoutSuccessPage() {
   const { refetchPaidStatus, paid, paidLoading } = useCompletion()
   const { isLoaded, isSignedIn } = useUser()
+  const [timedOut, setTimedOut] = useState(false)
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Once Clerk resolves, refetch paid status from the server so the gate
-  // reflects the real post-payment state without writing anything locally.
-  useEffect(() => {
-    if (isLoaded && isSignedIn) {
-      refetchPaidStatus()
+  function stopPolling() {
+    if (intervalRef.current !== null) {
+      clearInterval(intervalRef.current)
+      intervalRef.current = null
     }
-    // refetchPaidStatus is intentionally excluded: we only want this to fire
-    // when Clerk finishes loading, not on every context re-render.
+    if (timeoutRef.current !== null) {
+      clearTimeout(timeoutRef.current)
+      timeoutRef.current = null
+    }
+  }
+
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn) return
+
+    // Kick off first check immediately, then poll every 2s until paid or timeout.
+    refetchPaidStatus()
+
+    intervalRef.current = setInterval(() => {
+      refetchPaidStatus()
+    }, POLL_INTERVAL_MS)
+
+    timeoutRef.current = setTimeout(() => {
+      stopPolling()
+      setTimedOut(true)
+    }, POLL_TIMEOUT_MS)
+
+    return stopPolling
+    // refetchPaidStatus is stable (defined outside render); intentionally omitted
+    // from deps so the poll starts once when Clerk resolves, not on every re-render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoaded, isSignedIn])
 
-  if (paidLoading) {
+  // Stop polling immediately when paid is confirmed.
+  useEffect(() => {
+    if (paid) stopPolling()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paid])
+
+  if (paid) {
     return (
       <div className="checkout-shell">
-        <h1>Verifying payment…</h1>
-        <p>Please wait while we confirm your purchase.</p>
+        <h1>Payment Successful</h1>
+        <p>Your certification purchase was confirmed. You now have full access to the course.</p>
+        <Link to="/dashboard" className="btn-primary">Continue to Dashboard →</Link>
       </div>
     )
   }
 
-  if (!paid) {
+  if (timedOut) {
     return (
       <div className="checkout-shell">
         <h1>Payment Not Verified</h1>
@@ -1516,9 +1692,8 @@ function CheckoutSuccessPage() {
 
   return (
     <div className="checkout-shell">
-      <h1>Payment Successful</h1>
-      <p>Your certification purchase was confirmed. You now have full access to the course.</p>
-      <Link to="/dashboard" className="btn-primary">Continue to Dashboard →</Link>
+      <h1>Verifying payment…</h1>
+      <p>Please wait while we confirm your purchase.</p>
     </div>
   )
 }
@@ -1543,6 +1718,44 @@ function PaidGuard({ children }: { children: React.ReactNode }) {
   if (DEV_BYPASS_PAID_GUARD) return <>{children}</>
   if (!clerkLoaded || !isSignedIn || paidLoading) return null
   if (!paid) return <Navigate to="/" replace />
+  return <>{children}</>
+}
+
+// Course routes now enforce the 60-day full-course access window.
+// Reads courseAccessActive from CompletionContext (sourced from /payment-status).
+function CourseAccessGuard({ children }: { children: React.ReactNode }) {
+  const { courseAccessActive, paidLoading } = useCompletion()
+  const { isLoaded: clerkLoaded, isSignedIn } = useUser()
+  if (DEV_BYPASS_PAID_GUARD) return <>{children}</>
+  if (!clerkLoaded || !isSignedIn || paidLoading) return null
+  if (!courseAccessActive) return <Navigate to="/" replace />
+  return <>{children}</>
+}
+
+// Certificate access remains tied to certification validity, independent of course access window.
+// Allows access when course access is still active OR when the user holds a valid certification.
+function CertAccessGuard({ children }: { children: React.ReactNode }) {
+  const { courseAccessActive, paidLoading } = useCompletion()
+  const { isLoaded: clerkLoaded, isSignedIn } = useUser()
+  const { getToken } = useAuth()
+  const [certActive, setCertActive] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    if (!clerkLoaded || !isSignedIn) return
+    getToken().then((token) => {
+      const base = import.meta.env.VITE_API_URL ?? ''
+      fetch(`${base}/my-certification`, { headers: { Authorization: `Bearer ${token}` } })
+        .then((r) => r.json())
+        .then((data) => {
+          setCertActive(!!(data?.expiresAt && new Date(data.expiresAt) > new Date()))
+        })
+        .catch(() => setCertActive(false))
+    })
+  }, [clerkLoaded, isSignedIn, getToken])
+
+  if (DEV_BYPASS_PAID_GUARD) return <>{children}</>
+  if (!clerkLoaded || !isSignedIn || paidLoading || certActive === null) return null
+  if (!courseAccessActive && !certActive) return <Navigate to="/" replace />
   return <>{children}</>
 }
 
@@ -1581,7 +1794,7 @@ function ProtectedDashboard() {
 function ProtectedCourse() {
   return (
     <>
-      <SignedIn><PaidGuard><CoursePage /></PaidGuard></SignedIn>
+      <SignedIn><CourseAccessGuard><CoursePage /></CourseAccessGuard></SignedIn>
       <SignedOut><Navigate to="/sign-in" replace /></SignedOut>
     </>
   )
@@ -1590,7 +1803,7 @@ function ProtectedCourse() {
 function ProtectedLesson() {
   return (
     <>
-      <SignedIn><PaidGuard><LessonPage /></PaidGuard></SignedIn>
+      <SignedIn><CourseAccessGuard><LessonPage /></CourseAccessGuard></SignedIn>
       <SignedOut><Navigate to="/sign-in" replace /></SignedOut>
     </>
   )
@@ -1599,7 +1812,7 @@ function ProtectedLesson() {
 function ProtectedQuiz() {
   return (
     <>
-      <SignedIn><PaidGuard><QuizPage /></PaidGuard></SignedIn>
+      <SignedIn><CourseAccessGuard><QuizPage /></CourseAccessGuard></SignedIn>
       <SignedOut><Navigate to="/sign-in" replace /></SignedOut>
     </>
   )
@@ -1608,7 +1821,7 @@ function ProtectedQuiz() {
 function ProtectedFinalExam() {
   return (
     <>
-      <SignedIn><PaidGuard><FinalExamPage /></PaidGuard></SignedIn>
+      <SignedIn><CourseAccessGuard><FinalExamPage /></CourseAccessGuard></SignedIn>
       <SignedOut><Navigate to="/sign-in" replace /></SignedOut>
     </>
   )
@@ -1617,7 +1830,7 @@ function ProtectedFinalExam() {
 function ProtectedCertificate() {
   return (
     <>
-      <SignedIn><PaidGuard><CertificatePage /></PaidGuard></SignedIn>
+      <SignedIn><CertAccessGuard><CertificatePage /></CertAccessGuard></SignedIn>
       <SignedOut><Navigate to="/sign-in" replace /></SignedOut>
     </>
   )
@@ -1627,6 +1840,7 @@ function ProtectedCertificate() {
 
 export default function App() {
   const { user } = useUser()
+  const { getToken } = useAuth()
   const userId = user?.id ?? null
 
   // State starts empty; useEffect below loads the correct user's data once
@@ -1635,6 +1849,7 @@ export default function App() {
   const [quizResults, setQuizResults] = useState<Record<string, QuizResult>>({})
   const [finalExamResult, setFinalExamResultState] = useState<QuizResult | null>(null)
   const [paid, setPaidState] = useState<boolean>(false)
+  const [courseAccessActive, setCourseAccessActive] = useState<boolean>(false)
   const [paidLoading, setPaidLoading] = useState<boolean>(true)
 
   useEffect(() => {
@@ -1644,6 +1859,7 @@ export default function App() {
       setQuizResults({})
       setFinalExamResultState(null)
       setPaidState(false)
+      setCourseAccessActive(false)
       setPaidLoading(false)
       return
     }
@@ -1657,25 +1873,51 @@ export default function App() {
       setQuizResults(s ? JSON.parse(s) : {})
     } catch { setQuizResults({}) }
 
-    const exam = localStorage.getItem(`wci_final_exam_result_${userId}`)
-    setFinalExamResultState(exam === 'passed' || exam === 'failed' ? exam : null)
+    // Seed from localStorage immediately for instant UI.
+    const examLocal = localStorage.getItem(`wci_final_exam_result_${userId}`)
+    setFinalExamResultState(examLocal === 'passed' || examLocal === 'failed' ? examLocal : null)
 
     // Fetch paid status from the server — this is the authoritative source.
     const controller = new AbortController()
     loadPaidStatus(userId, controller.signal)
+
+    // Override with server truth: if UserCertification exists with a valid expiry,
+    // mark as passed regardless of localStorage (recovers cleared-storage users).
+    const base = import.meta.env.VITE_API_URL ?? ''
+    getToken({ skipCache: true }).then((token) => {
+      if (controller.signal.aborted) return
+      return fetch(`${base}/my-certification`, {
+        headers: { Authorization: `Bearer ${token}` },
+        signal: controller.signal,
+      })
+        .then((r) => r.json())
+        .then((data) => {
+          if (data?.expiresAt && new Date(data.expiresAt) > new Date()) {
+            setFinalExamResultState('passed')
+            localStorage.setItem(`wci_final_exam_result_${userId}`, 'passed')
+          }
+        })
+        .catch(() => {}) // network failure — keep localStorage value
+    }).catch(() => {})
+
     return () => { controller.abort() }
-  }, [userId])
+  }, [userId, getToken])
 
   const loadPaidStatus = (uid: string, signal?: AbortSignal) => {
     const base = import.meta.env.VITE_API_URL ?? ''
     setPaidLoading(true)
     fetch(`${base}/payment-status?clerkUserId=${uid}`, { signal })
       .then((res) => { if (!res.ok) throw new Error(`${res.status}`); return res.json() })
-      .then((data) => { setPaidState(data.paid === true); setPaidLoading(false) })
+      .then((data) => {
+        setPaidState(data.paid === true)
+        setCourseAccessActive(data.courseAccessActive === true)
+        setPaidLoading(false)
+      })
       .catch((err) => {
         if (err.name === 'AbortError') return
         // Network error: fall back to localStorage so the app stays usable offline
         setPaidState(localStorage.getItem(`wci_paid_user_${uid}`) === 'true')
+        setCourseAccessActive(false)
         setPaidLoading(false)
       })
   }
@@ -1720,6 +1962,7 @@ export default function App() {
         finalExamResult,
         setFinalExamResult,
         paid,
+        courseAccessActive,
         paidLoading,
         refetchPaidStatus,
       }}
