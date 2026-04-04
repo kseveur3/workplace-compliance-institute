@@ -1461,6 +1461,7 @@ function CertificatePage() {
   const { user } = useUser()
   const { getToken } = useAuth()
   const [certName, setCertName] = useState<string | null>(null)
+  const [certificateId, setCertificateId] = useState<string | null>(null)
 
   useEffect(() => {
     const uid = user?.id
@@ -1470,6 +1471,7 @@ function CertificatePage() {
       fetch(`${base}/my-certification`, { headers: { Authorization: `Bearer ${token}` } })
         .then((r) => r.json())
         .then((data) => {
+          if (data?.certificateId) setCertificateId(data.certificateId)
           if (data?.fullName) {
             setCertName(data.fullName)
           } else {
@@ -1535,6 +1537,12 @@ function CertificatePage() {
         <hr className="certificate-divider" />
 
         <p className="certificate-date">Issued {date}</p>
+
+        {certificateId && (
+          <p style={{ fontFamily: 'var(--font-ui)', fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 'var(--sp-4)', letterSpacing: '0.04em' }}>
+            Certificate ID: {certificateId}
+          </p>
+        )}
       </div>
     </div>
   )
