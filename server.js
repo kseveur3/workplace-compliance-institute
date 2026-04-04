@@ -291,8 +291,12 @@ app.get("/ceu-access", clerkMiddleware(), async (req, res) => {
       });
       return res.json({ allowed: !!cert });
     }
-    // External user without certId: check 30-day CEU window on PaidUser.
-    const record = await prisma.paidUser.findUnique({ where: { clerkUserId } });
+    // External user without certId: check 30-day CEU window.
+    // Migrated to multi-exam foundation (ExamAccess). Internal certId-based CEU access
+    // remains on legacy Certification logic above until UserCertification writes are in place.
+    const record = await prisma.examAccess.findUnique({
+      where: { clerkUserId_examId: { clerkUserId, examId: "exam_eeo_investigator" } },
+    });
     const allowed = !!(record?.ceuAccessUntil && record.ceuAccessUntil > new Date());
     res.json({ allowed });
   } catch (err) {
