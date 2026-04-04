@@ -78,6 +78,23 @@ app.post(
             data: { ceuPaidAt: new Date() },
           });
           console.log("CEU payment recorded for cert:", certId, "user:", clerkUserId);
+
+          // Dual-write: mirror ceuPaidAt into UserCertification if it exists.
+          try {
+            const userCert = await prisma.userCertification.findUnique({
+              where: { clerkUserId_examId: { clerkUserId, examId: "exam_eeo_investigator" } },
+            });
+            if (userCert) {
+              await prisma.userCertification.update({
+                where: { clerkUserId_examId: { clerkUserId, examId: "exam_eeo_investigator" } },
+                data: { ceuPaidAt: new Date() },
+              });
+            } else {
+              console.warn("[dual-write] UserCertification not found for internal CEU, skipping:", clerkUserId);
+            }
+          } catch (err) {
+            console.error("[dual-write] UserCertification ceuPaidAt update failed:", err.message);
+          }
         } else {
           // External user without a certId: grant 30-day CEU access window via PaidUser.
           const ceuAccessUntil = new Date();
@@ -88,6 +105,17 @@ app.post(
             update: { ceuAccessUntil },
           });
           console.log("CEU 30-day access granted for external user:", clerkUserId, "until:", ceuAccessUntil);
+
+          // Dual-write: mirror CEU access window into ExamAccess.
+          try {
+            await prisma.examAccess.upsert({
+              where: { clerkUserId_examId: { clerkUserId, examId: "exam_eeo_investigator" } },
+              create: { clerkUserId, examId: "exam_eeo_investigator", ceuAccessUntil },
+              update: { ceuAccessUntil },
+            });
+          } catch (err) {
+            console.error("[dual-write] ExamAccess CEU upsert failed:", err.message);
+          }
         }
       } else {
         // Full certification purchase.
@@ -110,6 +138,17 @@ app.post(
         });
 
         console.log("Created certification record for:", clerkUserId);
+
+        // Dual-write: mirror purchase entitlement into ExamAccess.
+        try {
+          await prisma.examAccess.upsert({
+            where: { clerkUserId_examId: { clerkUserId, examId: "exam_eeo_investigator" } },
+            create: { clerkUserId, examId: "exam_eeo_investigator" },
+            update: {},
+          });
+        } catch (err) {
+          console.error("[dual-write] ExamAccess purchase upsert failed:", err.message);
+        }
       }
     }
 
