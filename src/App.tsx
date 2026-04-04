@@ -639,6 +639,9 @@ const TOTAL_LESSONS = ACTIVE_COURSE.sections.reduce((sum, s) => sum + s.lessons.
 
 function CoursePage() {
   const { completed, quizResults, finalExamResult } = useCompletion()
+  const { user } = useUser()
+  const { getToken } = useAuth()
+  const navigate = useNavigate()
   const location = useLocation()
   const quizSummary = (
     location.state as {
@@ -655,7 +658,46 @@ function CoursePage() {
   const allQuizzesPassed = ACTIVE_COURSE.sections.every((s) => quizResults[s.id] === 'passed')
   const eligible = allLessonsDone && allQuizzesPassed
 
+  const [showNameModal, setShowNameModal] = useState(false)
+  const [nameInput, setNameInput] = useState('')
+  const [nameSaving, setNameSaving] = useState(false)
+
+  function handleFinalExamClick() {
+    const uid = user?.id
+    const stored = uid ? localStorage.getItem(`wci_cert_name_${uid}`) : null
+    if (stored) {
+      navigate('/final-exam')
+    } else {
+      setShowNameModal(true)
+    }
+  }
+
+  async function handleNameSave() {
+    const trimmed = nameInput.trim()
+    if (!trimmed) return
+    setNameSaving(true)
+    const uid = user?.id
+    if (uid) {
+      localStorage.setItem(`wci_cert_name_${uid}`, trimmed)
+    }
+    try {
+      const token = await getToken()
+      const base = import.meta.env.VITE_API_URL ?? ''
+      await fetch(`${base}/set-full-name`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ fullName: trimmed }),
+      })
+    } catch {
+      // localStorage copy is the fallback; network failure is non-blocking
+    }
+    setNameSaving(false)
+    setShowNameModal(false)
+    navigate('/final-exam')
+  }
+
   return (
+    <>
     <div className="page-shell">
       <Link to="/dashboard" className="page-back-link">← Back to Dashboard</Link>
 
@@ -733,9 +775,9 @@ function CoursePage() {
             {eligible ? '✓ Certification Unlocked' : '⊘ Certification Locked'}
           </span>
           {eligible ? (
-            <Link to="/final-exam" className="btn-primary" style={{ fontSize: '0.75rem' }}>
+            <button className="btn-primary" style={{ fontSize: '0.75rem' }} onClick={handleFinalExamClick}>
               Take Final Exam
-            </Link>
+            </button>
           ) : (
             <button disabled className="btn-primary" style={{ fontSize: '0.75rem', opacity: 0.35, cursor: 'not-allowed' }}>
               Take Final Exam
@@ -785,6 +827,45 @@ function CoursePage() {
         )
       })}
     </div>
+
+    {showNameModal && (
+      <div className="name-modal-overlay">
+        <div className="name-modal">
+          <p className="name-modal__title">Enter your name for the certificate</p>
+          <p className="name-modal__desc">
+            This name will appear on your certificate exactly as entered.
+          </p>
+          <input
+            className="name-modal__input"
+            type="text"
+            placeholder="Full name"
+            value={nameInput}
+            onChange={(e) => setNameInput(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') handleNameSave() }}
+            autoFocus
+          />
+          <div className="name-modal__actions">
+            <button
+              className="btn-secondary"
+              style={{ fontSize: '0.8rem' }}
+              onClick={() => setShowNameModal(false)}
+              disabled={nameSaving}
+            >
+              Cancel
+            </button>
+            <button
+              className="btn-primary"
+              style={{ fontSize: '0.8rem' }}
+              onClick={handleNameSave}
+              disabled={!nameInput.trim() || nameSaving}
+            >
+              {nameSaving ? 'Saving…' : 'Continue to Exam'}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   )
 }
 
@@ -973,6 +1054,7 @@ const DEV_BYPASS_FINAL_EXAM = false // TODO: remove before production
 function FinalExamPage() {
   const { completed, quizResults, finalExamResult, setFinalExamResult } = useCompletion()
   const { user } = useUser()
+  const { getToken } = useAuth()
   const allLessonsDone = ALL_LESSONS.every((l) => completed.has(l.id))
   const allQuizzesPassed = ACTIVE_COURSE.sections.every((s) => quizResults[s.id] === 'passed')
   const eligible = DEV_BYPASS_FINAL_EXAM || (allLessonsDone && allQuizzesPassed)
@@ -982,6 +1064,8 @@ function FinalExamPage() {
     Array(ACTIVE_FINAL_EXAM.length).fill(null)
   )
   const [showResults, setShowResults] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [issuanceError, setIssuanceError] = useState(false)
 
   if (!eligible) {
     return (
@@ -1104,44 +1188,54 @@ function FinalExamPage() {
 
       <button
         className="quiz-submit"
-        disabled={selected === null}
-        onClick={() => {
+        disabled={selected === null || isSubmitting}
+        onClick={async () => {
           if (isLast) {
             const correct = answers.filter(
               (a, i) => a === ACTIVE_FINAL_EXAM[i].correctIndex
             ).length
             const passed = correct / ACTIVE_FINAL_EXAM.length >= 0.8
-            setFinalExamResult(passed ? 'passed' : 'failed')
-            if (passed) {
-              const email = user?.primaryEmailAddress?.emailAddress
-              if (email) {
-                const records: {
-                  email: string
-                  courseName: string
-                  completionDate: string
-                }[] = JSON.parse(
-                  localStorage.getItem('wci_certifications') || '[]'
-                )
-                const date = new Date().toLocaleDateString('en-US', {
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric',
-                })
-                const idx = records.findIndex((r) => r.email === email)
-                const record = { email, courseName: ACTIVE_COURSE.title, completionDate: date }
-                if (idx >= 0) records[idx] = record
-                else records.push(record)
-                localStorage.setItem('wci_certifications', JSON.stringify(records))
-              }
+
+            if (!passed) {
+              setFinalExamResult('failed')
+              setShowResults(true)
+              return
             }
-            setShowResults(true)
+
+            // Passed — issue certification server-side before marking locally.
+            setIsSubmitting(true)
+            setIssuanceError(false)
+            try {
+              const uid = user?.id
+              const fullName = (uid ? localStorage.getItem(`wci_cert_name_${uid}`) : null) ?? ''
+              const token = await getToken()
+              const base = import.meta.env.VITE_API_URL ?? ''
+              const res = await fetch(`${base}/complete-exam`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ fullName }),
+              })
+              if (!res.ok) throw new Error(`${res.status}`)
+              // Server confirmed — now mark locally and show results.
+              setFinalExamResult('passed')
+              setShowResults(true)
+            } catch {
+              setIssuanceError(true)
+            } finally {
+              setIsSubmitting(false)
+            }
           } else {
             setCurrentIndex((i) => i + 1)
           }
         }}
       >
-        {isLast ? 'Submit Exam' : 'Next Question'}
+        {isSubmitting ? 'Saving…' : isLast ? 'Submit Exam' : 'Next Question'}
       </button>
+      {issuanceError && (
+        <p style={{ fontFamily: 'var(--font-ui)', fontSize: '0.875rem', color: 'var(--color-error)', marginTop: 'var(--sp-4)' }}>
+          Something went wrong saving your result. Please try submitting again.
+        </p>
+      )}
     </div>
   )
 }
@@ -1365,10 +1459,43 @@ function ProtectedCeu() {
 function CertificatePage() {
   const { finalExamResult } = useCompletion()
   const { user } = useUser()
+  const { getToken } = useAuth()
+  const [certName, setCertName] = useState<string | null>(null)
+
+  useEffect(() => {
+    const uid = user?.id
+    // Try server first (backfilled users have UserCertification.fullName)
+    getToken().then((token) => {
+      const base = import.meta.env.VITE_API_URL ?? ''
+      fetch(`${base}/my-certification`, { headers: { Authorization: `Bearer ${token}` } })
+        .then((r) => r.json())
+        .then((data) => {
+          if (data?.fullName) {
+            setCertName(data.fullName)
+          } else {
+            // Fallback: localStorage (set before exam for new users)
+            const local = uid ? localStorage.getItem(`wci_cert_name_${uid}`) : null
+            setCertName(local ?? user?.primaryEmailAddress?.emailAddress ?? null)
+            // If we found a name in localStorage and the server record now exists, persist it
+            if (local && data !== null) {
+              fetch(`${base}/set-full-name`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ fullName: local }),
+              }).catch(() => {})
+            }
+          }
+        })
+        .catch(() => {
+          const local = uid ? localStorage.getItem(`wci_cert_name_${uid}`) : null
+          setCertName(local ?? user?.primaryEmailAddress?.emailAddress ?? null)
+        })
+    })
+  }, [user, getToken])
 
   if (finalExamResult !== 'passed') return <Navigate to="/course" replace />
 
-  const email = user?.primaryEmailAddress?.emailAddress ?? 'the participant'
+  const displayName = certName ?? user?.primaryEmailAddress?.emailAddress ?? 'the participant'
   const date = new Date().toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'long',
@@ -1391,7 +1518,7 @@ function CertificatePage() {
 
         <p className="certificate-presents">This certifies that</p>
 
-        <p className="certificate-name">{email}</p>
+        <p className="certificate-name">{displayName}</p>
 
         <p
           style={{
@@ -1680,6 +1807,7 @@ function ProtectedCertificate() {
 
 export default function App() {
   const { user } = useUser()
+  const { getToken } = useAuth()
   const userId = user?.id ?? null
 
   // State starts empty; useEffect below loads the correct user's data once
@@ -1712,14 +1840,35 @@ export default function App() {
       setQuizResults(s ? JSON.parse(s) : {})
     } catch { setQuizResults({}) }
 
-    const exam = localStorage.getItem(`wci_final_exam_result_${userId}`)
-    setFinalExamResultState(exam === 'passed' || exam === 'failed' ? exam : null)
+    // Seed from localStorage immediately for instant UI.
+    const examLocal = localStorage.getItem(`wci_final_exam_result_${userId}`)
+    setFinalExamResultState(examLocal === 'passed' || examLocal === 'failed' ? examLocal : null)
 
     // Fetch paid status from the server — this is the authoritative source.
     const controller = new AbortController()
     loadPaidStatus(userId, controller.signal)
+
+    // Override with server truth: if UserCertification exists with a valid expiry,
+    // mark as passed regardless of localStorage (recovers cleared-storage users).
+    const base = import.meta.env.VITE_API_URL ?? ''
+    getToken({ skipCache: true }).then((token) => {
+      if (controller.signal.aborted) return
+      return fetch(`${base}/my-certification`, {
+        headers: { Authorization: `Bearer ${token}` },
+        signal: controller.signal,
+      })
+        .then((r) => r.json())
+        .then((data) => {
+          if (data?.expiresAt && new Date(data.expiresAt) > new Date()) {
+            setFinalExamResultState('passed')
+            localStorage.setItem(`wci_final_exam_result_${userId}`, 'passed')
+          }
+        })
+        .catch(() => {}) // network failure — keep localStorage value
+    }).catch(() => {})
+
     return () => { controller.abort() }
-  }, [userId])
+  }, [userId, getToken])
 
   const loadPaidStatus = (uid: string, signal?: AbortSignal) => {
     const base = import.meta.env.VITE_API_URL ?? ''
