@@ -1077,8 +1077,8 @@ function FinalExamPage() {
 function CeuPage() {
   const { user } = useUser()
   const { getToken } = useAuth()
+  // CEU flow is now keyed server-side by authenticated user + exam. certId is no longer needed in the browser.
   const [searchParams] = useSearchParams()
-  const certId = searchParams.get('certId')
   const returnType = searchParams.get('type')
   const justPaid = returnType === 'paid'
 
@@ -1097,14 +1097,13 @@ function CeuPage() {
 
   useEffect(() => {
     if (justPaid) { setAllowed(true); setAccessChecked(true); return }
-    const url = certId ? `/ceu-access?certId=${encodeURIComponent(certId)}` : '/ceu-access'
     getToken().then((token) => {
-      fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+      fetch('/ceu-access', { headers: { Authorization: `Bearer ${token}` } })
         .then((r) => r.json())
         .then((data) => { setAllowed(!!data.allowed); setAccessChecked(true) })
         .catch(() => setAccessChecked(true))
     })
-  }, [certId, justPaid, getToken])
+  }, [justPaid, getToken])
 
   const [currentIndex, setCurrentIndex] = useState(0)
   const [answers, setAnswers] = useState<(number | null)[]>(
@@ -1134,7 +1133,7 @@ function CeuPage() {
               const res = await fetch(`${base}/create-ceu-checkout-session`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                body: JSON.stringify({ certId }),
+                body: JSON.stringify({}),
               })
               const text = await res.text()
               let data: any = {}
@@ -1255,12 +1254,11 @@ function CeuPage() {
             const passed = correct / CEU_QUESTIONS.length >= 0.8
 
             if (passed && user?.id) {
-              // Trigger CEU renewal on pass (certId may be null for external users)
               try {
                 await fetch('/ceu-complete', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ clerkUserId: user.id, certId }),
+                  body: JSON.stringify({ clerkUserId: user.id }),
                 })
               } catch (err) {
                 console.error('Failed to record CEU renewal:', err)
