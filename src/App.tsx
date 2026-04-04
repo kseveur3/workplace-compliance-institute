@@ -338,12 +338,63 @@ function useCompletion() {
   return useContext(CompletionContext)
 }
 
-// ─── Home Page ────────────────────────────────────────────────────────────────
+// ─── Catalog Page ─────────────────────────────────────────────────────────────
 
-function HomePage() {
+function CatalogPage() {
+  const { paid } = useCompletion()
+
+  return (
+    <>
+      <div className="home-shell">
+        <header className="home-brand">
+          <h1>Workplace Compliance Institute</h1>
+          <hr className="home-brand-rule" />
+          <p>Professional Certification &amp; Training</p>
+        </header>
+
+        <main>
+          <SignedIn>
+            {paid && (
+              <p style={{ fontFamily: 'var(--font-ui)', fontSize: '0.875rem', marginBottom: 'var(--sp-4)' }}>
+                <Link to="/dashboard" style={{ color: 'var(--text-secondary)', textDecoration: 'underline' }}>Go to your Dashboard</Link>
+              </p>
+            )}
+          </SignedIn>
+          <p className="home-cta-desc" style={{ marginBottom: 'var(--sp-6)' }}>Choose a certification path to get started.</p>
+          <div className="info-panel info-panel--warm info-panel--featured" style={{ marginBottom: 'var(--sp-6)' }}>
+            <p className="info-panel__title">EEO Investigator Certification</p>
+            <p className="home-cta-desc">
+              Earn a verifiable certification in federal equal employment opportunity law and complaint investigation.
+            </p>
+            <p style={{ fontFamily: 'var(--font-ui)', fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: 'var(--sp-2)' }}>Available for new certification or CEU renewal.</p>
+            <Link to="/eeo-investigator" className="btn-primary" style={{ display: 'inline-block', marginTop: 'var(--sp-4)' }}>View Certification</Link>
+          </div>
+
+          <p className="home-verify-link">
+            <Link to="/verify">Verify a Certificate</Link>
+          </p>
+        </main>
+      </div>
+
+      <footer style={{ position: 'fixed', bottom: 'var(--sp-4)', left: 0, width: '100%', textAlign: 'center', pointerEvents: 'none' }}>
+        <Link to="/admin/sign-in" style={{ fontFamily: 'var(--font-ui)', fontSize: '0.75rem', color: 'var(--text-muted)', textDecoration: 'none', pointerEvents: 'auto' }}
+          onMouseEnter={e => (e.currentTarget.style.textDecoration = 'underline')}
+          onMouseLeave={e => (e.currentTarget.style.textDecoration = 'none')}
+        >Admin</Link>
+      </footer>
+    </>
+  )
+}
+
+// ─── EEO Investigator Detail Page ─────────────────────────────────────────────
+
+function EeoDetailPage() {
   const { paid } = useCompletion()
   const { user } = useUser()
   const [purchasing, setPurchasing] = useState(false)
+
+  const sectionHeading = { fontFamily: 'var(--font-ui)', fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)' } as const
+  const sectionDesc = { fontFamily: 'var(--font-ui)', fontSize: '0.875rem', color: 'var(--text-secondary)' } as const
 
   async function handlePurchase() {
     setPurchasing(true)
@@ -365,6 +416,7 @@ function HomePage() {
   return (
     <>
     <div className="home-shell">
+      <Link to="/" className="page-back-link" style={{ display: 'inline-block', marginBottom: '12px', color: 'var(--text-secondary)', fontWeight: 600, textDecoration: 'underline' }}>← Back to Home</Link>
       <header className="home-brand">
         <h1>Workplace Compliance Institute</h1>
         <hr className="home-brand-rule" />
@@ -374,26 +426,29 @@ function HomePage() {
       <main>
         <h2 className="home-cta-title">EEO Investigator Certification</h2>
         <p className="home-cta-desc">
-          Complete a self-paced training program and earn a verifiable certification in federal equal employment opportunity law and investigation.
+          Complete a self-paced training program and earn a verifiable certification in federal equal employment opportunity law and complaint investigation.
         </p>
 
-        <SignedOut>
-          {paid ? (
-            <Link to="/sign-in" className="btn-primary">Log In</Link>
-          ) : (
-            <div className="home-btn-row">
-              <Link to="/sign-up" className="btn-primary">Start Certification</Link>
-              <Link to="/sign-in" className="btn-secondary">Log In</Link>
-            </div>
-          )}
-        </SignedOut>
-
-        <SignedIn>
-          {paid ? (
-            <Link to="/dashboard" className="btn-primary">Go to Dashboard</Link>
-          ) : (
-            <div>
+        {/* ── Section 1: Get Certified ── */}
+        <div style={{ marginBottom: 'var(--sp-8)' }}>
+          <h3 style={{ fontFamily: 'var(--font-ui)', fontSize: '1rem', fontWeight: 600, marginBottom: 'var(--sp-1)', color: 'var(--text-primary)' }}>Get Certified</h3>
+          <p style={{ fontFamily: 'var(--font-ui)', fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: 'var(--sp-3)' }}>Complete the full training and final exam to earn your certification.</p>
+          <SignedOut>
+            {paid ? (
+              <Link to="/sign-in" className="btn-primary">Log In</Link>
+            ) : (
               <div className="home-btn-row">
+                <Link to="/sign-up" className="btn-primary">Start Certification</Link>
+                <Link to="/sign-in" className="btn-secondary">Log In</Link>
+              </div>
+            )}
+          </SignedOut>
+
+          <SignedIn>
+            {paid ? (
+              <Link to="/dashboard" className="btn-primary">Go to Dashboard</Link>
+            ) : (
+              <div>
                 <button
                   onClick={handlePurchase}
                   disabled={purchasing}
@@ -402,16 +457,23 @@ function HomePage() {
                 >
                   {purchasing ? 'Redirecting…' : 'Purchase Certification'}
                 </button>
-                <Link to="/ceu" className="btn-secondary">Renew Certification (CEU)</Link>
+                <p style={{ marginTop: 'var(--sp-3)' }}>
+                  <SignOutButton>
+                    <button style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'var(--font-ui)', fontSize: '0.8rem', color: 'var(--text-muted)', textDecoration: 'underline' }}>Log out</button>
+                  </SignOutButton>
+                </p>
               </div>
-              <p style={{ marginTop: 'var(--sp-3)', textAlign: 'center' }}>
-                <SignOutButton>
-                  <button style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'var(--font-ui)', fontSize: '0.8rem', color: 'var(--text-muted)', textDecoration: 'underline' }}>Log out</button>
-                </SignOutButton>
-              </p>
-            </div>
-          )}
-        </SignedIn>
+            )}
+          </SignedIn>
+        </div>
+
+        {/* ── Section 2: Renew Certification (CEU) ── */}
+        <div style={{ marginBottom: 'var(--sp-6)' }}>
+          <h3 style={{ fontFamily: 'var(--font-ui)', fontSize: '1rem', fontWeight: 600, marginBottom: 'var(--sp-1)', color: 'var(--text-primary)' }}>Renew Certification (CEU)</h3>
+          <p style={{ fontFamily: 'var(--font-ui)', fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: 'var(--sp-1)' }}>Complete the renewal course and exam to extend your certification.</p>
+          <p style={{ fontFamily: 'var(--font-ui)', fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: 'var(--sp-3)' }}>Already certified elsewhere? You can still renew here.</p>
+          <Link to="/ceu" className="btn-secondary" style={{ display: 'inline-block' }}>Go to CEU Renewal</Link>
+        </div>
 
         <p className="home-verify-link">
           <Link to="/verify">Verify a Certificate</Link>
@@ -1581,7 +1643,8 @@ export default function App() {
       }}
     >
       <Routes>
-        <Route path="/" element={<HomePage />} />
+        <Route path="/" element={<CatalogPage />} />
+        <Route path="/eeo-investigator" element={<EeoDetailPage />} />
         <Route path="/sign-in/*" element={<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 'var(--sp-10)' }}><div style={{ width: 'fit-content' }}><Link to="/" className="page-back-link" style={{ display: 'inline-block', marginBottom: '12px', color: 'var(--text-secondary)', fontWeight: 600, textDecoration: 'underline' }}>← Back to Home</Link><SignIn routing="path" path="/sign-in" /></div></div>} />
         <Route path="/sign-up/*" element={<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 'var(--sp-10)' }}><div style={{ width: 'fit-content' }}><Link to="/" className="page-back-link" style={{ display: 'inline-block', marginBottom: '12px', color: 'var(--text-secondary)', fontWeight: 600, textDecoration: 'underline' }}>← Back to Home</Link><SignUp routing="path" path="/sign-up" /></div></div>} />
         <Route path="/dashboard" element={<ProtectedDashboard />} />
