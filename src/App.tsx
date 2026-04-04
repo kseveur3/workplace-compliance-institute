@@ -1,4 +1,4 @@
-import { useState, useEffect, createContext, useContext } from 'react'
+import { useState, useEffect, useRef, createContext, useContext } from 'react'
 import { AdminAiContentPage } from './pages/admin-ai-content'
 import { Routes, Route, Link, Navigate, useParams, useNavigate, useLocation, useSearchParams } from 'react-router-dom'
 import { SignIn, SignUp, SignedIn, SignedOut, SignOutButton, useUser, useAuth } from '@clerk/clerk-react'
@@ -1622,31 +1622,65 @@ function VerifyPage() {
 
 // ─── Checkout Pages ───────────────────────────────────────────────────────────
 
+const POLL_INTERVAL_MS = 2000
+const POLL_TIMEOUT_MS = 30000
+
 function CheckoutSuccessPage() {
   const { refetchPaidStatus, paid, paidLoading } = useCompletion()
   const { isLoaded, isSignedIn } = useUser()
+  const [timedOut, setTimedOut] = useState(false)
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Once Clerk resolves, refetch paid status from the server so the gate
-  // reflects the real post-payment state without writing anything locally.
-  useEffect(() => {
-    if (isLoaded && isSignedIn) {
-      refetchPaidStatus()
+  function stopPolling() {
+    if (intervalRef.current !== null) {
+      clearInterval(intervalRef.current)
+      intervalRef.current = null
     }
-    // refetchPaidStatus is intentionally excluded: we only want this to fire
-    // when Clerk finishes loading, not on every context re-render.
+    if (timeoutRef.current !== null) {
+      clearTimeout(timeoutRef.current)
+      timeoutRef.current = null
+    }
+  }
+
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn) return
+
+    // Kick off first check immediately, then poll every 2s until paid or timeout.
+    refetchPaidStatus()
+
+    intervalRef.current = setInterval(() => {
+      refetchPaidStatus()
+    }, POLL_INTERVAL_MS)
+
+    timeoutRef.current = setTimeout(() => {
+      stopPolling()
+      setTimedOut(true)
+    }, POLL_TIMEOUT_MS)
+
+    return stopPolling
+    // refetchPaidStatus is stable (defined outside render); intentionally omitted
+    // from deps so the poll starts once when Clerk resolves, not on every re-render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoaded, isSignedIn])
 
-  if (paidLoading) {
+  // Stop polling immediately when paid is confirmed.
+  useEffect(() => {
+    if (paid) stopPolling()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paid])
+
+  if (paid) {
     return (
       <div className="checkout-shell">
-        <h1>Verifying payment…</h1>
-        <p>Please wait while we confirm your purchase.</p>
+        <h1>Payment Successful</h1>
+        <p>Your certification purchase was confirmed. You now have full access to the course.</p>
+        <Link to="/dashboard" className="btn-primary">Continue to Dashboard →</Link>
       </div>
     )
   }
 
-  if (!paid) {
+  if (timedOut) {
     return (
       <div className="checkout-shell">
         <h1>Payment Not Verified</h1>
@@ -1658,9 +1692,8 @@ function CheckoutSuccessPage() {
 
   return (
     <div className="checkout-shell">
-      <h1>Payment Successful</h1>
-      <p>Your certification purchase was confirmed. You now have full access to the course.</p>
-      <Link to="/dashboard" className="btn-primary">Continue to Dashboard →</Link>
+      <h1>Verifying payment…</h1>
+      <p>Please wait while we confirm your purchase.</p>
     </div>
   )
 }
