@@ -394,17 +394,17 @@ app.get("/renew", async (req, res) => {
 });
 
 // ── Current user's most recent certification ──────────────────────────────────
-// Returns the latest Certification record for the authenticated user.
+// Now sourced from the multi-exam foundation (UserCertification).
+// Legacy certId (Certification.id) is no longer returned — it is not used by the active CEU flow.
 app.get("/my-certification", clerkMiddleware(), async (req, res) => {
   const { userId: clerkUserId } = getAuth(req);
   if (!clerkUserId) {
     return res.status(401).json({ error: "Unauthorized" });
   }
   try {
-    const cert = await prisma.certification.findFirst({
-      where: { clerkUserId },
-      orderBy: { createdAt: "desc" },
-      select: { id: true, issuedAt: true, expiresAt: true, renewedAt: true },
+    const cert = await prisma.userCertification.findUnique({
+      where: { clerkUserId_examId: { clerkUserId, examId: "exam_eeo_investigator" } },
+      select: { issuedAt: true, expiresAt: true, renewedAt: true },
     });
     res.json(cert ?? null);
   } catch (err) {
