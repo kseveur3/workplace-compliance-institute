@@ -341,8 +341,29 @@ function useCompletion() {
 
 // ─── Catalog Page ─────────────────────────────────────────────────────────────
 
+// Dashboard shortcuts now align with owned-exams access (any ExamAccess row),
+// not the legacy single-exam paid flag.
+function useHasOwnedExams(): boolean {
+  const { isLoaded: clerkLoaded, isSignedIn } = useUser()
+  const { getToken } = useAuth()
+  const [hasExams, setHasExams] = useState(false)
+
+  useEffect(() => {
+    if (!clerkLoaded || !isSignedIn) return
+    const base = import.meta.env.VITE_API_URL ?? ''
+    getToken().then((token) => {
+      fetch(`${base}/my-exams`, { headers: { Authorization: `Bearer ${token}` } })
+        .then((r) => r.json())
+        .then((exams: ExamEntry[]) => setHasExams(exams.length > 0))
+        .catch(() => {})
+    })
+  }, [clerkLoaded, isSignedIn, getToken])
+
+  return hasExams
+}
+
 function CatalogPage() {
-  const { paid } = useCompletion()
+  const hasOwnedExams = useHasOwnedExams()
 
   return (
     <>
@@ -355,7 +376,7 @@ function CatalogPage() {
 
         <main>
           <SignedIn>
-            {paid && (
+            {hasOwnedExams && (
               <p style={{ fontFamily: 'var(--font-ui)', fontSize: '0.875rem', marginBottom: 'var(--sp-4)' }}>
                 <Link to="/dashboard" style={{ color: 'var(--text-secondary)', textDecoration: 'underline' }}>Go to your Dashboard</Link>
               </p>
