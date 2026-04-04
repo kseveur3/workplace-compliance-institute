@@ -39,6 +39,54 @@ model Certification {
   @@index([expiresAt])
 }
 
+// ── Multi-exam foundation (Phase 1) ──────────────────────────────────────────
+
+model Exam {
+  id             String              @id @default(cuid())
+  slug           String              @unique
+  title          String
+  stripePriceId  String
+  ceuPriceId     String?
+  active         Boolean             @default(true)
+
+  accesses       ExamAccess[]
+  certifications UserCertification[]
+}
+
+model ExamAccess {
+  id             String    @id @default(cuid())
+  clerkUserId    String
+  examId         String
+  exam           Exam      @relation(fields: [examId], references: [id])
+
+  purchasedAt    DateTime  @default(now())
+  ceuAccessUntil DateTime?
+
+  @@unique([clerkUserId, examId])
+  @@index([clerkUserId])
+}
+
+model UserCertification {
+  id          String    @id @default(cuid())
+  clerkUserId String
+  examId      String
+  exam        Exam      @relation(fields: [examId], references: [id])
+
+  issuedAt    DateTime
+  expiresAt   DateTime
+  renewedAt   DateTime?
+  ceuPaidAt   DateTime?
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([clerkUserId, examId])
+  @@index([clerkUserId])
+  @@index([expiresAt])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 model EmailLog {
   id              String    @id @default(cuid())
   clerkUserId     String
