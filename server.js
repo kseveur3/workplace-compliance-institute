@@ -420,7 +420,7 @@ app.get("/my-certification", clerkMiddleware(), async (req, res) => {
   try {
     const cert = await prisma.userCertification.findUnique({
       where: { clerkUserId_examId: { clerkUserId, examId: EEO_EXAM.id } },
-      select: { issuedAt: true, expiresAt: true, renewedAt: true, fullName: true },
+      select: { issuedAt: true, expiresAt: true, renewedAt: true, fullName: true, certificateId: true },
     });
     res.json(cert ?? null);
   } catch (err) {
@@ -456,13 +456,33 @@ app.post("/complete-exam", clerkMiddleware(), async (req, res) => {
     const expiresAt = new Date(issuedAt);
     expiresAt.setFullYear(expiresAt.getFullYear() + 1);
 
+    // Generate a candidate certificate ID.
+    // Format: WCI-EEO-<6 uppercase alphanumeric chars>, e.g. WCI-EEO-A7F3K9.
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no O/0, I/1 to avoid confusion
+    const randomSuffix = Array.from(
+      { length: 6 },
+      () => chars[Math.floor(Math.random() * chars.length)]
+    ).join("");
+    const newCertificateId = `WCI-EEO-${randomSuffix}`;
+
+    // Check if the row already exists and whether it has a certificateId.
+    // We need this to decide whether to assign one on the update path.
+    const existing = await prisma.userCertification.findUnique({
+      where: { clerkUserId_examId: { clerkUserId, examId: EEO_EXAM.id } },
+      select: { certificateId: true },
+    });
+    // Only assign on update when the existing row has no ID yet.
+    // Never overwrite a populated certificateId.
+    const assignIdOnUpdate = existing !== null && existing.certificateId === null;
+
     // Upsert: safe to retry. On re-completion we refresh issuedAt, expiresAt,
     // and fullName so a name correction before retaking the exam takes effect.
-    await prisma.userCertification.upsert({
+    const result = await prisma.userCertification.upsert({
       where: { clerkUserId_examId: { clerkUserId, examId: EEO_EXAM.id } },
       create: {
         clerkUserId,
         examId: EEO_EXAM.id,
+        certificateId: newCertificateId,
         fullName: fullName.trim(),
         issuedAt,
         expiresAt,
@@ -471,11 +491,15 @@ app.post("/complete-exam", clerkMiddleware(), async (req, res) => {
         fullName: fullName.trim(),
         issuedAt,
         expiresAt,
+        // Only set certificateId if the row exists but has none yet.
+        // If certificateId is already populated, omitting it preserves the original.
+        ...(assignIdOnUpdate ? { certificateId: newCertificateId } : {}),
       },
+      select: { certificateId: true },
     });
 
-    console.log(`[/complete-exam] Certification issued for ${clerkUserId}`);
-    res.json({ issued: true, issuedAt, expiresAt });
+    console.log(`[/complete-exam] Certification issued for ${clerkUserId}, id=${result.certificateId}`);
+    res.json({ issued: true, issuedAt, expiresAt, certificateId: result.certificateId });
   } catch (err) {
     console.error("[/complete-exam]", err.message);
     res.status(500).json({ error: "Failed to issue certification" });
