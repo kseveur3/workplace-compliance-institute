@@ -1626,7 +1626,7 @@ const POLL_INTERVAL_MS = 2000
 const POLL_TIMEOUT_MS = 30000
 
 function CheckoutSuccessPage() {
-  const { refetchPaidStatus, paid, paidLoading } = useCompletion()
+  const { refetchPaidStatus, paid } = useCompletion()
   const { isLoaded, isSignedIn } = useUser()
   const [timedOut, setTimedOut] = useState(false)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -1712,14 +1712,6 @@ function CheckoutCancelPage() {
 
 const DEV_BYPASS_PAID_GUARD = false // TODO: remove before production
 
-function PaidGuard({ children }: { children: React.ReactNode }) {
-  const { paid, paidLoading } = useCompletion()
-  const { isLoaded: clerkLoaded, isSignedIn } = useUser()
-  if (DEV_BYPASS_PAID_GUARD) return <>{children}</>
-  if (!clerkLoaded || !isSignedIn || paidLoading) return null
-  if (!paid) return <Navigate to="/" replace />
-  return <>{children}</>
-}
 
 // Course routes now enforce the 60-day full-course access window.
 // Reads courseAccessActive from CompletionContext (sourced from /payment-status).
