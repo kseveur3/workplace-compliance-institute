@@ -411,7 +411,8 @@ function CatalogPage() {
 // ─── EEO Investigator Detail Page ─────────────────────────────────────────────
 
 function EeoDetailPage() {
-  const { paid } = useCompletion()
+  // Existing owners are routed to dashboard based on owned-exam access, not legacy paid status.
+  const hasOwnedExams = useHasOwnedExams()
   const { user } = useUser()
   const [purchasing, setPurchasing] = useState(false)
 
@@ -453,18 +454,14 @@ function EeoDetailPage() {
           <h3 style={{ fontFamily: 'var(--font-ui)', fontSize: '1rem', fontWeight: 600, marginBottom: 'var(--sp-1)', color: 'var(--text-primary)' }}>Get Certified</h3>
           <p style={{ fontFamily: 'var(--font-ui)', fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: 'var(--sp-3)' }}>Complete the full training and final exam to earn your certification.</p>
           <SignedOut>
-            {paid ? (
-              <Link to="/sign-in" className="btn-primary">Log In</Link>
-            ) : (
-              <div className="home-btn-row">
-                <Link to="/sign-up" className="btn-primary">Start Certification</Link>
-                <Link to="/sign-in" className="btn-secondary">Log In</Link>
-              </div>
-            )}
+            <div className="home-btn-row">
+              <Link to="/sign-up" className="btn-primary">Start Certification</Link>
+              <Link to="/sign-in" className="btn-secondary">Log In</Link>
+            </div>
           </SignedOut>
 
           <SignedIn>
-            {paid ? (
+            {hasOwnedExams ? (
               <div>
                 <p style={{ fontFamily: 'var(--font-ui)', fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: 'var(--sp-3)' }}>Manage your certification progress, renewal, and access from your dashboard.</p>
                 <Link to="/dashboard" className="btn-primary">Go to Dashboard</Link>
@@ -489,8 +486,8 @@ function EeoDetailPage() {
           </SignedIn>
         </div>
 
-        {/* ── Section 2: Renew Certification (CEU) — hidden for paid users ── */}
-        {!paid && (
+        {/* ── Section 2: Renew Certification (CEU) — hidden for owners who use dashboard ── */}
+        {!hasOwnedExams && (
           <div style={{ marginBottom: 'var(--sp-6)' }}>
             <h3 style={{ fontFamily: 'var(--font-ui)', fontSize: '1rem', fontWeight: 600, marginBottom: 'var(--sp-1)', color: 'var(--text-primary)' }}>Renew Certification (CEU)</h3>
             <p style={{ fontFamily: 'var(--font-ui)', fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: 'var(--sp-1)' }}>Complete the renewal course and exam to extend your certification.</p>
