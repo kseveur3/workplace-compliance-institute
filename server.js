@@ -422,6 +422,55 @@ app.get("/my-certification", clerkMiddleware(), async (req, res) => {
   }
 });
 
+// ── Owned exams — future dashboard source for multi-exam ownership ────────────
+// Returns one item per ExamAccess row for the current user, with related Exam
+// metadata and the associated UserCertification (if earned).
+app.get("/my-exams", clerkMiddleware(), async (req, res) => {
+  const { userId: clerkUserId } = getAuth(req);
+  if (!clerkUserId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  try {
+    const accesses = await prisma.examAccess.findMany({
+      where: { clerkUserId },
+      include: {
+        exam: { select: { title: true, slug: true } },
+      },
+    });
+
+    const certifications = await prisma.userCertification.findMany({
+      where: { clerkUserId },
+      select: { examId: true, issuedAt: true, expiresAt: true, renewedAt: true, ceuPaidAt: true },
+    });
+
+    const certByExam = new Map(certifications.map((c) => [c.examId, c]));
+
+    const result = accesses.map((a) => {
+      const cert = certByExam.get(a.examId) ?? null;
+      return {
+        examId: a.examId,
+        examTitle: a.exam.title,
+        examSlug: a.exam.slug,
+        purchasedAt: a.purchasedAt,
+        ceuAccessUntil: a.ceuAccessUntil ?? null,
+        certification: cert
+          ? {
+              issuedAt: cert.issuedAt,
+              expiresAt: cert.expiresAt,
+              renewedAt: cert.renewedAt ?? null,
+              ceuPaidAt: cert.ceuPaidAt ?? null,
+            }
+          : null,
+      };
+    });
+
+    res.json(result);
+  } catch (err) {
+    console.error("[/my-exams]", err.message);
+    res.status(500).json({ error: "Failed to load exams" });
+  }
+});
+
 // ── Admin: Generate full certification (mock) ────────────────────────────────
 app.post("/api/admin/generate-certification", async (req, res) => {
   res.json({

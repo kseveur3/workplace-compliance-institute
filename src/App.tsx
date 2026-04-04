@@ -499,30 +499,50 @@ function EeoDetailPage() {
 
 function DashboardPage() {
   const { user } = useUser()
+  const { getToken } = useAuth()
   const { completed, quizResults } = useCompletion()
   const totalLessons = ACTIVE_COURSE.sections.reduce((sum, s) => sum + s.lessons.length, 0)
   const quizzesPassed = ACTIVE_COURSE.sections.filter((s) => quizResults[s.id] === 'passed').length
 
+  // Dashboard now sources ownership and certification lifecycle data from /my-exams.
+  // UI is still intentionally single-exam for this phase — EEO entry is selected by slug.
+  type ExamEntry = {
+    examSlug: string
+    ceuAccessUntil: string | null
+    certification: { issuedAt: string; expiresAt: string; renewedAt: string | null } | null
+  }
   const [ceuStatusText, setCeuStatusText] = useState("")
+  const [certStatusText, setCertStatusText] = useState("")
 
   useEffect(() => {
     if (!user?.id) return
     const base = import.meta.env.VITE_API_URL ?? ''
-    fetch(`${base}/payment-status?clerkUserId=${user.id}`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (!data.ceuAccessUntil) return
-        const until = new Date(data.ceuAccessUntil)
-        const now = new Date()
-        if (until <= now) {
-          setCeuStatusText('CEU access expired — renew to continue')
-        } else {
-          const days = Math.ceil((until.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
-          setCeuStatusText(`CEU access: ${days} day${days === 1 ? '' : 's'} remaining`)
-        }
-      })
-      .catch(() => {})
-  }, [user?.id])
+    getToken().then((token) => {
+      fetch(`${base}/my-exams`, { headers: { Authorization: `Bearer ${token}` } })
+        .then((r) => r.json())
+        .then((exams: ExamEntry[]) => {
+          const eeoExam = exams.find((e) => e.examSlug === COURSE.id)
+
+          if (eeoExam?.ceuAccessUntil) {
+            const until = new Date(eeoExam.ceuAccessUntil)
+            const now = new Date()
+            if (until <= now) {
+              setCeuStatusText('CEU access expired — renew to continue')
+            } else {
+              const days = Math.ceil((until.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+              setCeuStatusText(`CEU access: ${days} day${days === 1 ? '' : 's'} remaining`)
+            }
+          }
+
+          if (eeoExam?.certification?.expiresAt) {
+            const expires = new Date(eeoExam.certification.expiresAt)
+            const renewed = eeoExam.certification.renewedAt ? ' (renewed)' : ''
+            setCertStatusText(`Certification active until ${expires.toLocaleDateString()}${renewed}`)
+          }
+        })
+        .catch(() => {})
+    })
+  }, [user?.id, getToken])
 
   return (
     <div className="page-shell">
@@ -543,6 +563,7 @@ function DashboardPage() {
           A structured program covering federal equal employment opportunity law,
           complaint investigation procedures, and agency compliance standards.
         </p>
+        {certStatusText && <p className="dash-course-progress">{certStatusText}</p>}
         <p className="dash-course-progress">
           {completed.size} of {totalLessons} lessons completed
           {quizzesPassed > 0 &&
