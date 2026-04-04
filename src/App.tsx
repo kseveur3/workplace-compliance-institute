@@ -443,7 +443,10 @@ function EeoDetailPage() {
 
           <SignedIn>
             {paid ? (
-              <Link to="/dashboard" className="btn-primary">Go to Dashboard</Link>
+              <div>
+                <p style={{ fontFamily: 'var(--font-ui)', fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: 'var(--sp-3)' }}>Manage your certification progress, renewal, and access from your dashboard.</p>
+                <Link to="/dashboard" className="btn-primary">Go to Dashboard</Link>
+              </div>
             ) : (
               <div>
                 <button
@@ -464,13 +467,15 @@ function EeoDetailPage() {
           </SignedIn>
         </div>
 
-        {/* ── Section 2: Renew Certification (CEU) ── */}
-        <div style={{ marginBottom: 'var(--sp-6)' }}>
-          <h3 style={{ fontFamily: 'var(--font-ui)', fontSize: '1rem', fontWeight: 600, marginBottom: 'var(--sp-1)', color: 'var(--text-primary)' }}>Renew Certification (CEU)</h3>
-          <p style={{ fontFamily: 'var(--font-ui)', fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: 'var(--sp-1)' }}>Complete the renewal course and exam to extend your certification.</p>
-          <p style={{ fontFamily: 'var(--font-ui)', fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: 'var(--sp-3)' }}>Already certified elsewhere? You can still renew here.</p>
-          <Link to="/ceu" className="btn-secondary" style={{ display: 'inline-block' }}>Go to CEU Renewal</Link>
-        </div>
+        {/* ── Section 2: Renew Certification (CEU) — hidden for paid users ── */}
+        {!paid && (
+          <div style={{ marginBottom: 'var(--sp-6)' }}>
+            <h3 style={{ fontFamily: 'var(--font-ui)', fontSize: '1rem', fontWeight: 600, marginBottom: 'var(--sp-1)', color: 'var(--text-primary)' }}>Renew Certification (CEU)</h3>
+            <p style={{ fontFamily: 'var(--font-ui)', fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: 'var(--sp-1)' }}>Complete the renewal course and exam to extend your certification.</p>
+            <p style={{ fontFamily: 'var(--font-ui)', fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: 'var(--sp-3)' }}>Already certified elsewhere? You can still renew here.</p>
+            <Link to="/ceu" className="btn-secondary" style={{ display: 'inline-block' }}>Go to CEU Renewal</Link>
+          </div>
+        )}
 
         <p className="home-verify-link">
           <Link to="/verify">Verify a Certificate</Link>
