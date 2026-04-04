@@ -254,8 +254,20 @@ app.post("/ceu-complete", clerkMiddleware(), async (req, res) => {
         where: { id: certId },
         data: { renewedAt: issuedAt, issuedAt, expiresAt, ceuPaidAt: null },
       });
+
+      // Dual-write: mirror renewal into UserCertification.
+      try {
+        await prisma.userCertification.upsert({
+          where: { clerkUserId_examId: { clerkUserId, examId: "exam_eeo_investigator" } },
+          create: { clerkUserId, examId: "exam_eeo_investigator", issuedAt, expiresAt, renewedAt: issuedAt, ceuPaidAt: null },
+          update: { issuedAt, expiresAt, renewedAt: issuedAt, ceuPaidAt: null },
+        });
+      } catch (err) {
+        console.error("[dual-write] UserCertification renewal upsert failed:", err.message);
+      }
     }
-    // External user without certId: leave the 30-day CEU window active until it expires.
+    // External user without certId: no-op intentional — leave the 30-day CEU window
+    // active until it expires. UserCertification is not created for external users.
   } catch (err) {
     console.error("[/ceu-complete]", err.message);
     return res.status(500).json({ success: false, error: "Failed to record renewal" });
@@ -290,16 +302,20 @@ app.get("/ceu-access", clerkMiddleware(), async (req, res) => {
 });
 
 // ── Payment status — server-side source of truth ──────────────────────────────
+// First migrated read on the multi-exam foundation: reads from ExamAccess instead of PaidUser.
 app.get("/payment-status", async (req, res) => {
   try {
     const { clerkUserId } = req.query;
     if (!clerkUserId || typeof clerkUserId !== "string") {
       return res.status(400).json({ error: "clerkUserId is required" });
     }
-    const record = await prisma.paidUser.findUnique({
-      where: { clerkUserId },
+    const record = await prisma.examAccess.findUnique({
+      where: { clerkUserId_examId: { clerkUserId, examId: "exam_eeo_investigator" } },
     });
-    res.json({ paid: !!record, ceuAccessUntil: record?.ceuAccessUntil ?? null });
+    // paid = true only for full certification purchase (ceuAccessUntil is null).
+    // CEU-only external users have ceuAccessUntil set and do not get full course access.
+    const paid = !!(record && record.ceuAccessUntil === null);
+    res.json({ paid, ceuAccessUntil: record?.ceuAccessUntil ?? null });
   } catch (err) {
     console.error("[/payment-status]", err);
     res.status(500).json({ error: "payment-status failed" });
