@@ -1528,10 +1528,33 @@ function PaidGuard({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
+// Dashboard access is now based on owned exams, not the legacy single-exam paid flag.
+// Fetches /my-exams and allows access when the user owns at least one exam.
+function OwnedExamsGuard({ children }: { children: React.ReactNode }) {
+  const { isLoaded: clerkLoaded, isSignedIn } = useUser()
+  const { getToken } = useAuth()
+  const [hasExams, setHasExams] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    if (!clerkLoaded || !isSignedIn) return
+    const base = import.meta.env.VITE_API_URL ?? ''
+    getToken().then((token) => {
+      fetch(`${base}/my-exams`, { headers: { Authorization: `Bearer ${token}` } })
+        .then((r) => r.json())
+        .then((exams: ExamEntry[]) => setHasExams(exams.length > 0))
+        .catch(() => setHasExams(false))
+    })
+  }, [clerkLoaded, isSignedIn, getToken])
+
+  if (!clerkLoaded || !isSignedIn || hasExams === null) return null
+  if (!hasExams) return <Navigate to="/" replace />
+  return <>{children}</>
+}
+
 function ProtectedDashboard() {
   return (
     <>
-      <SignedIn><DashboardPage /></SignedIn>
+      <SignedIn><OwnedExamsGuard><DashboardPage /></OwnedExamsGuard></SignedIn>
       <SignedOut><Navigate to="/sign-in" replace /></SignedOut>
     </>
   )
