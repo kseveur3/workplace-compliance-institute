@@ -497,6 +497,33 @@ function EeoDetailPage() {
 
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 
+// Dashboard card rendering is now data-driven from owned exams via /my-exams.
+// Route/actions are still EEO-first for this phase — non-EEO exams render info only.
+type ExamEntry = {
+  examId: string
+  examTitle: string
+  examSlug: string
+  purchasedAt: string
+  ceuAccessUntil: string | null
+  certification: { issuedAt: string; expiresAt: string; renewedAt: string | null } | null
+}
+
+function ceuStatusText(ceuAccessUntil: string | null): string {
+  if (!ceuAccessUntil) return ''
+  const until = new Date(ceuAccessUntil)
+  const now = new Date()
+  if (until <= now) return 'CEU access expired — renew to continue'
+  const days = Math.ceil((until.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+  return `CEU access: ${days} day${days === 1 ? '' : 's'} remaining`
+}
+
+function certStatusText(certification: ExamEntry['certification']): string {
+  if (!certification?.expiresAt) return ''
+  const expires = new Date(certification.expiresAt)
+  const renewed = certification.renewedAt ? ' (renewed)' : ''
+  return `Certification active until ${expires.toLocaleDateString()}${renewed}`
+}
+
 function DashboardPage() {
   const { user } = useUser()
   const { getToken } = useAuth()
@@ -504,15 +531,7 @@ function DashboardPage() {
   const totalLessons = ACTIVE_COURSE.sections.reduce((sum, s) => sum + s.lessons.length, 0)
   const quizzesPassed = ACTIVE_COURSE.sections.filter((s) => quizResults[s.id] === 'passed').length
 
-  // Dashboard now sources ownership and certification lifecycle data from /my-exams.
-  // UI is still intentionally single-exam for this phase — EEO entry is selected by slug.
-  type ExamEntry = {
-    examSlug: string
-    ceuAccessUntil: string | null
-    certification: { issuedAt: string; expiresAt: string; renewedAt: string | null } | null
-  }
-  const [ceuStatusText, setCeuStatusText] = useState("")
-  const [certStatusText, setCertStatusText] = useState("")
+  const [myExams, setMyExams] = useState<ExamEntry[]>([])
 
   useEffect(() => {
     if (!user?.id) return
@@ -520,26 +539,7 @@ function DashboardPage() {
     getToken().then((token) => {
       fetch(`${base}/my-exams`, { headers: { Authorization: `Bearer ${token}` } })
         .then((r) => r.json())
-        .then((exams: ExamEntry[]) => {
-          const eeoExam = exams.find((e) => e.examSlug === COURSE.id)
-
-          if (eeoExam?.ceuAccessUntil) {
-            const until = new Date(eeoExam.ceuAccessUntil)
-            const now = new Date()
-            if (until <= now) {
-              setCeuStatusText('CEU access expired — renew to continue')
-            } else {
-              const days = Math.ceil((until.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
-              setCeuStatusText(`CEU access: ${days} day${days === 1 ? '' : 's'} remaining`)
-            }
-          }
-
-          if (eeoExam?.certification?.expiresAt) {
-            const expires = new Date(eeoExam.certification.expiresAt)
-            const renewed = eeoExam.certification.renewedAt ? ' (renewed)' : ''
-            setCertStatusText(`Certification active until ${expires.toLocaleDateString()}${renewed}`)
-          }
-        })
+        .then((exams: ExamEntry[]) => setMyExams(exams))
         .catch(() => {})
     })
   }, [user?.id, getToken])
@@ -554,27 +554,46 @@ function DashboardPage() {
 
       <hr className="dash-divider" />
 
-      <div
-        className="info-panel info-panel--warm info-panel--featured"
-        style={{ marginBottom: ceuStatusText ? 'var(--sp-3)' : 'var(--sp-6)' }}
-      >
-        <p className="info-panel__title">{COURSE.title}</p>
-        <p className="dash-course-desc">
-          A structured program covering federal equal employment opportunity law,
-          complaint investigation procedures, and agency compliance standards.
-        </p>
-        {certStatusText && <p className="dash-course-progress">{certStatusText}</p>}
-        <p className="dash-course-progress">
-          {completed.size} of {totalLessons} lessons completed
-          {quizzesPassed > 0 &&
-            ` · ${quizzesPassed} of ${ACTIVE_COURSE.sections.length} section quizzes passed`}
-        </p>
-      </div>
+      {myExams.map((exam) => {
+        const ceuText = ceuStatusText(exam.ceuAccessUntil)
+        const certText = certStatusText(exam.certification)
+        const isEeo = exam.examSlug === COURSE.id
 
-      {ceuStatusText && <p style={{ fontFamily: 'var(--font-ui)', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>{ceuStatusText}</p>}
+        return (
+          <div key={exam.examId}>
+            <div
+              className="info-panel info-panel--warm info-panel--featured"
+              style={{ marginBottom: ceuText ? 'var(--sp-3)' : 'var(--sp-6)' }}
+            >
+              <p className="info-panel__title">{exam.examTitle}</p>
+              {isEeo && (
+                <p className="dash-course-desc">
+                  A structured program covering federal equal employment opportunity law,
+                  complaint investigation procedures, and agency compliance standards.
+                </p>
+              )}
+              {certText && <p className="dash-course-progress">{certText}</p>}
+              {isEeo && (
+                <p className="dash-course-progress">
+                  {completed.size} of {totalLessons} lessons completed
+                  {quizzesPassed > 0 &&
+                    ` · ${quizzesPassed} of ${ACTIVE_COURSE.sections.length} section quizzes passed`}
+                </p>
+              )}
+            </div>
+
+            {ceuText && <p style={{ fontFamily: 'var(--font-ui)', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>{ceuText}</p>}
+            {isEeo && (
+              <div className="action-row" style={{ marginBottom: 'var(--sp-6)' }}>
+                <Link to="/course" className="link-btn">View Course</Link>
+                <Link to="/ceu" className="btn-primary">Renew Certification</Link>
+              </div>
+            )}
+          </div>
+        )
+      })}
+
       <div className="action-row">
-        <Link to="/course" className="link-btn">View Course</Link>
-        <Link to="/ceu" className="btn-primary">Renew Certification</Link>
         <SignOutButton />
       </div>
     </div>
