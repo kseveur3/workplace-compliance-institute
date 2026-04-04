@@ -393,9 +393,6 @@ function EeoDetailPage() {
   const { user } = useUser()
   const [purchasing, setPurchasing] = useState(false)
 
-  const sectionHeading = { fontFamily: 'var(--font-ui)', fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)' } as const
-  const sectionDesc = { fontFamily: 'var(--font-ui)', fontSize: '0.875rem', color: 'var(--text-secondary)' } as const
-
   async function handlePurchase() {
     setPurchasing(true)
     try {
