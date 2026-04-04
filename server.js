@@ -23,6 +23,15 @@ const prisma = new PrismaClient({ adapter });
 
 app.use(cors({ origin: ["http://localhost:5173", "http://localhost:5174"] }));
 
+// ── Exam config ───────────────────────────────────────────────────────────────
+const EEO_EXAM = {
+  id: "exam_eeo_investigator",
+  slug: "eeo-investigator",
+  title: "EEO Investigator Certification",
+  stripePriceId: process.env.STRIPE_PRICE_ID,
+  ceuPriceId: process.env.STRIPE_CEU_PRICE_ID,
+};
+
 // ── Stripe webhook ────────────────────────────────────────────────────────────
 // MUST be registered before express.json(). Stripe signature verification
 // requires the raw request body; express.json() would consume it first.
@@ -63,9 +72,66 @@ app.post(
       }
 
       if (session.metadata?.productType === "ceu") {
-        // CEU renewal payment: unlock the exam for the specific certification.
-        const { certId } = session.metadata;
-        if (certId) {
+        // Webhook temporarily supports both metadata styles during certId phase-out.
+        // New sessions carry { clerkUserId, examId, productType } — no certId.
+        // Legacy in-flight sessions carry { clerkUserId, certId, productType } — no examId.
+        const { certId, examId } = session.metadata;
+
+        if (examId) {
+          // ── New-style session: route by UserCertification existence ──────────
+          // Internal users (passed main exam) have a UserCertification row → set ceuPaidAt.
+          // External users (no cert) do not → grant 30-day access window.
+          const userCert = await prisma.userCertification.findUnique({
+            where: { clerkUserId_examId: { clerkUserId, examId } },
+          });
+
+          if (userCert) {
+            // Internal user: mark ceuPaidAt to unlock the renewal exam.
+            await prisma.userCertification.update({
+              where: { clerkUserId_examId: { clerkUserId, examId } },
+              data: { ceuPaidAt: new Date() },
+            });
+            console.log("CEU payment recorded (examId) for internal user:", clerkUserId);
+
+            // Dual-write: keep legacy Certification in sync while table still exists.
+            try {
+              const legacyCert = await prisma.certification.findFirst({
+                where: { clerkUserId },
+                orderBy: { createdAt: "desc" },
+              });
+              if (legacyCert) {
+                await prisma.certification.update({
+                  where: { id: legacyCert.id },
+                  data: { ceuPaidAt: new Date() },
+                });
+              }
+            } catch (err) {
+              console.error("[dual-write] Legacy Certification ceuPaidAt update failed:", err.message);
+            }
+          } else {
+            // External user: grant 30-day CEU access window.
+            const ceuAccessUntil = new Date();
+            ceuAccessUntil.setDate(ceuAccessUntil.getDate() + 30);
+            await prisma.examAccess.upsert({
+              where: { clerkUserId_examId: { clerkUserId, examId } },
+              create: { clerkUserId, examId, ceuAccessUntil },
+              update: { ceuAccessUntil },
+            });
+            console.log("CEU 30-day access granted (examId) for external user:", clerkUserId, "until:", ceuAccessUntil);
+
+            // Dual-write: keep legacy PaidUser in sync while table still exists.
+            try {
+              await prisma.paidUser.upsert({
+                where: { clerkUserId },
+                create: { clerkUserId, ceuAccessUntil },
+                update: { ceuAccessUntil },
+              });
+            } catch (err) {
+              console.error("[dual-write] PaidUser CEU upsert failed:", err.message);
+            }
+          }
+        } else if (certId) {
+          // ── Legacy in-flight session: certId-based internal user path ────────
           const ceuCert = await prisma.certification.findFirst({
             where: { id: certId, clerkUserId },
           });
@@ -77,26 +143,26 @@ app.post(
             where: { id: certId },
             data: { ceuPaidAt: new Date() },
           });
-          console.log("CEU payment recorded for cert:", certId, "user:", clerkUserId);
+          console.log("CEU payment recorded (certId legacy) for cert:", certId, "user:", clerkUserId);
 
           // Dual-write: mirror ceuPaidAt into UserCertification if it exists.
           try {
             const userCert = await prisma.userCertification.findUnique({
-              where: { clerkUserId_examId: { clerkUserId, examId: "exam_eeo_investigator" } },
+              where: { clerkUserId_examId: { clerkUserId, examId: EEO_EXAM.id } },
             });
             if (userCert) {
               await prisma.userCertification.update({
-                where: { clerkUserId_examId: { clerkUserId, examId: "exam_eeo_investigator" } },
+                where: { clerkUserId_examId: { clerkUserId, examId: EEO_EXAM.id } },
                 data: { ceuPaidAt: new Date() },
               });
             } else {
-              console.warn("[dual-write] UserCertification not found for internal CEU, skipping:", clerkUserId);
+              console.warn("[dual-write] UserCertification not found for legacy CEU, skipping:", clerkUserId);
             }
           } catch (err) {
             console.error("[dual-write] UserCertification ceuPaidAt update failed:", err.message);
           }
         } else {
-          // External user without a certId: grant 30-day CEU access window via PaidUser.
+          // ── Legacy in-flight session: external user (certId was "") ──────────
           const ceuAccessUntil = new Date();
           ceuAccessUntil.setDate(ceuAccessUntil.getDate() + 30);
           await prisma.paidUser.upsert({
@@ -104,13 +170,13 @@ app.post(
             create: { clerkUserId, ceuAccessUntil },
             update: { ceuAccessUntil },
           });
-          console.log("CEU 30-day access granted for external user:", clerkUserId, "until:", ceuAccessUntil);
+          console.log("CEU 30-day access granted (legacy external) for user:", clerkUserId, "until:", ceuAccessUntil);
 
           // Dual-write: mirror CEU access window into ExamAccess.
           try {
             await prisma.examAccess.upsert({
-              where: { clerkUserId_examId: { clerkUserId, examId: "exam_eeo_investigator" } },
-              create: { clerkUserId, examId: "exam_eeo_investigator", ceuAccessUntil },
+              where: { clerkUserId_examId: { clerkUserId, examId: EEO_EXAM.id } },
+              create: { clerkUserId, examId: EEO_EXAM.id, ceuAccessUntil },
               update: { ceuAccessUntil },
             });
           } catch (err) {
@@ -142,8 +208,8 @@ app.post(
         // Dual-write: mirror purchase entitlement into ExamAccess.
         try {
           await prisma.examAccess.upsert({
-            where: { clerkUserId_examId: { clerkUserId, examId: "exam_eeo_investigator" } },
-            create: { clerkUserId, examId: "exam_eeo_investigator" },
+            where: { clerkUserId_examId: { clerkUserId, examId: EEO_EXAM.id } },
+            create: { clerkUserId, examId: EEO_EXAM.id },
             update: {},
           });
         } catch (err) {
@@ -169,7 +235,7 @@ app.post("/create-checkout-session", async (req, res) => {
   try {
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
-      line_items: [{ price: process.env.STRIPE_PRICE_ID, quantity: 1 }],
+      line_items: [{ price: EEO_EXAM.stripePriceId, quantity: 1 }],
       success_url: `${process.env.CLIENT_URL || "http://localhost:5173"}/checkout-success`,
       cancel_url: `${process.env.CLIENT_URL || "http://localhost:5173"}/`,
       metadata: { clerkUserId },
@@ -181,43 +247,25 @@ app.post("/create-checkout-session", async (req, res) => {
 });
 
 // ── CEU checkout session creation ────────────────────────────────────────────
+// certId is being phased out in favor of (clerkUserId + examId).
+// Ownership is established by the authenticated clerkUserId alone.
 app.post("/create-ceu-checkout-session", clerkMiddleware(), async (req, res) => {
   const { userId: clerkUserId } = getAuth(req);
   if (!clerkUserId) {
     return res.status(401).json({ error: "Unauthorized" });
   }
 
-  const { certId } = req.body;
-
-  try {
-    if (certId) {
-      const cert = await prisma.certification.findFirst({
-        where: { id: certId, clerkUserId },
-      });
-      if (!cert) {
-        return res.status(404).json({ error: "Certification not found" });
-      }
-    }
-  } catch (err) {
-    console.error("[/create-ceu-checkout-session] DB error:", err.message);
-    return res.status(500).json({ error: "Failed to verify certification" });
-  }
-
   const CLIENT_URL = process.env.CLIENT_URL || "http://localhost:5173";
-  const successUrl = certId
-    ? `${CLIENT_URL}/ceu?certId=${certId}&type=paid`
-    : `${CLIENT_URL}/ceu?type=paid`;
-  const cancelUrl = certId
-    ? `${CLIENT_URL}/ceu?certId=${certId}&type=cancel`
-    : `${CLIENT_URL}/ceu?type=cancel`;
+  const successUrl = `${CLIENT_URL}/ceu?type=paid`;
+  const cancelUrl = `${CLIENT_URL}/ceu?type=cancel`;
 
   try {
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
-      line_items: [{ price: process.env.STRIPE_CEU_PRICE_ID, quantity: 1 }],
+      line_items: [{ price: EEO_EXAM.ceuPriceId, quantity: 1 }],
       success_url: successUrl,
       cancel_url: cancelUrl,
-      metadata: { clerkUserId, certId: certId ?? "", productType: "ceu" },
+      metadata: { clerkUserId, examId: EEO_EXAM.id, productType: "ceu" },
     });
     res.json({ url: session.url });
   } catch (err) {
@@ -226,7 +274,8 @@ app.post("/create-ceu-checkout-session", clerkMiddleware(), async (req, res) => 
 });
 
 // ── CEU renewal completion ────────────────────────────────────────────────────
-// Server-authoritative hook that marks a certification as renewed.
+// certId is no longer required for CEU completion.
+// Completion is now keyed by authenticated user + exam via UserCertification.
 // clerkUserId is read from the verified Clerk session — never trusted from the body.
 app.post("/ceu-complete", clerkMiddleware(), async (req, res) => {
   const { userId: clerkUserId } = getAuth(req);
@@ -234,40 +283,40 @@ app.post("/ceu-complete", clerkMiddleware(), async (req, res) => {
     return res.status(401).json({ success: false, error: "Unauthorized" });
   }
 
-  const { certId } = req.body;
-
   try {
-    if (certId) {
-      const cert = await prisma.certification.findFirst({
-        where: { id: certId, clerkUserId },
-      });
+    const userCert = await prisma.userCertification.findUnique({
+      where: { clerkUserId_examId: { clerkUserId, examId: EEO_EXAM.id } },
+    });
 
-      if (!cert) {
-        return res.status(404).json({ success: false, error: "Certification not found" });
-      }
-
+    if (userCert?.ceuPaidAt) {
+      // Internal user: ceuPaidAt confirms payment — complete the renewal.
       const issuedAt = new Date();
-      const expiresAt = new Date(cert.expiresAt);
+      const expiresAt = new Date(userCert.expiresAt);
       expiresAt.setFullYear(expiresAt.getFullYear() + 1);
 
-      await prisma.certification.update({
-        where: { id: certId },
+      await prisma.userCertification.update({
+        where: { clerkUserId_examId: { clerkUserId, examId: EEO_EXAM.id } },
         data: { renewedAt: issuedAt, issuedAt, expiresAt, ceuPaidAt: null },
       });
 
-      // Dual-write: mirror renewal into UserCertification.
+      // Dual-write: keep legacy Certification in sync while table still exists.
       try {
-        await prisma.userCertification.upsert({
-          where: { clerkUserId_examId: { clerkUserId, examId: "exam_eeo_investigator" } },
-          create: { clerkUserId, examId: "exam_eeo_investigator", issuedAt, expiresAt, renewedAt: issuedAt, ceuPaidAt: null },
-          update: { issuedAt, expiresAt, renewedAt: issuedAt, ceuPaidAt: null },
+        const legacyCert = await prisma.certification.findFirst({
+          where: { clerkUserId },
+          orderBy: { createdAt: "desc" },
         });
+        if (legacyCert) {
+          await prisma.certification.update({
+            where: { id: legacyCert.id },
+            data: { renewedAt: issuedAt, issuedAt, expiresAt, ceuPaidAt: null },
+          });
+        }
       } catch (err) {
-        console.error("[dual-write] UserCertification renewal upsert failed:", err.message);
+        console.error("[dual-write] Legacy Certification renewal update failed:", err.message);
       }
     }
-    // External user without certId: no-op intentional — leave the 30-day CEU window
-    // active until it expires. UserCertification is not created for external users.
+    // External user: no UserCertification row or ceuPaidAt is null — no-op intentional.
+    // External users' 30-day CEU window expires naturally via ExamAccess.ceuAccessUntil.
   } catch (err) {
     console.error("[/ceu-complete]", err.message);
     return res.status(500).json({ success: false, error: "Failed to record renewal" });
@@ -278,26 +327,28 @@ app.post("/ceu-complete", clerkMiddleware(), async (req, res) => {
 
 // ── CEU exam access check ─────────────────────────────────────────────────────
 // Returns { allowed: true } only when the user has a paid, unused CEU token.
+// certId is being phased out. Both internal and external paths now use (clerkUserId + examId).
+// Internal CEU access reads from UserCertification; external reads from ExamAccess.
+// The frontend may still send certId in the query string — it is intentionally ignored here.
 app.get("/ceu-access", clerkMiddleware(), async (req, res) => {
   const { userId: clerkUserId } = getAuth(req);
   if (!clerkUserId) {
     return res.status(401).json({ allowed: false });
   }
-  const { certId } = req.query;
   try {
-    if (certId && typeof certId === "string") {
-      const cert = await prisma.certification.findFirst({
-        where: { id: certId, clerkUserId, ceuPaidAt: { not: null } },
-      });
-      return res.json({ allowed: !!cert });
-    }
-    // External user without certId: check 30-day CEU window.
-    // Migrated to multi-exam foundation (ExamAccess). Internal certId-based CEU access
-    // remains on legacy Certification logic above until UserCertification writes are in place.
-    const record = await prisma.examAccess.findUnique({
-      where: { clerkUserId_examId: { clerkUserId, examId: "exam_eeo_investigator" } },
+    // Internal user: has a UserCertification row with ceuPaidAt set → renewal exam unlocked.
+    const userCert = await prisma.userCertification.findUnique({
+      where: { clerkUserId_examId: { clerkUserId, examId: EEO_EXAM.id } },
     });
-    const allowed = !!(record?.ceuAccessUntil && record.ceuAccessUntil > new Date());
+    if (userCert?.ceuPaidAt) {
+      return res.json({ allowed: true });
+    }
+
+    // External user: no UserCertification row — check the 30-day CEU access window.
+    const access = await prisma.examAccess.findUnique({
+      where: { clerkUserId_examId: { clerkUserId, examId: EEO_EXAM.id } },
+    });
+    const allowed = !!(access?.ceuAccessUntil && access.ceuAccessUntil > new Date());
     res.json({ allowed });
   } catch (err) {
     console.error("[/ceu-access]", err.message);
@@ -314,7 +365,7 @@ app.get("/payment-status", async (req, res) => {
       return res.status(400).json({ error: "clerkUserId is required" });
     }
     const record = await prisma.examAccess.findUnique({
-      where: { clerkUserId_examId: { clerkUserId, examId: "exam_eeo_investigator" } },
+      where: { clerkUserId_examId: { clerkUserId, examId: EEO_EXAM.id } },
     });
     // paid = true only for full certification purchase (ceuAccessUntil is null).
     // CEU-only external users have ceuAccessUntil set and do not get full course access.
@@ -352,22 +403,71 @@ app.get("/renew", async (req, res) => {
 });
 
 // ── Current user's most recent certification ──────────────────────────────────
-// Returns the latest Certification record for the authenticated user.
+// Now sourced from the multi-exam foundation (UserCertification).
+// Legacy certId (Certification.id) is no longer returned — it is not used by the active CEU flow.
 app.get("/my-certification", clerkMiddleware(), async (req, res) => {
   const { userId: clerkUserId } = getAuth(req);
   if (!clerkUserId) {
     return res.status(401).json({ error: "Unauthorized" });
   }
   try {
-    const cert = await prisma.certification.findFirst({
-      where: { clerkUserId },
-      orderBy: { createdAt: "desc" },
-      select: { id: true, issuedAt: true, expiresAt: true, renewedAt: true },
+    const cert = await prisma.userCertification.findUnique({
+      where: { clerkUserId_examId: { clerkUserId, examId: EEO_EXAM.id } },
+      select: { issuedAt: true, expiresAt: true, renewedAt: true },
     });
     res.json(cert ?? null);
   } catch (err) {
     console.error("[/my-certification]", err.message);
     res.status(500).json({ error: "Failed to load certification" });
+  }
+});
+
+// ── Owned exams — future dashboard source for multi-exam ownership ────────────
+// Returns one item per ExamAccess row for the current user, with related Exam
+// metadata and the associated UserCertification (if earned).
+app.get("/my-exams", clerkMiddleware(), async (req, res) => {
+  const { userId: clerkUserId } = getAuth(req);
+  if (!clerkUserId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  try {
+    const accesses = await prisma.examAccess.findMany({
+      where: { clerkUserId },
+      include: {
+        exam: { select: { title: true, slug: true } },
+      },
+    });
+
+    const certifications = await prisma.userCertification.findMany({
+      where: { clerkUserId },
+      select: { examId: true, issuedAt: true, expiresAt: true, renewedAt: true, ceuPaidAt: true },
+    });
+
+    const certByExam = new Map(certifications.map((c) => [c.examId, c]));
+
+    const result = accesses.map((a) => {
+      const cert = certByExam.get(a.examId) ?? null;
+      return {
+        examId: a.examId,
+        examTitle: a.exam.title,
+        examSlug: a.exam.slug,
+        purchasedAt: a.purchasedAt,
+        ceuAccessUntil: a.ceuAccessUntil ?? null,
+        certification: cert
+          ? {
+              issuedAt: cert.issuedAt,
+              expiresAt: cert.expiresAt,
+              renewedAt: cert.renewedAt ?? null,
+              ceuPaidAt: cert.ceuPaidAt ?? null,
+            }
+          : null,
+      };
+    });
+
+    res.json(result);
+  } catch (err) {
+    console.error("[/my-exams]", err.message);
+    res.status(500).json({ error: "Failed to load exams" });
   }
 });
 

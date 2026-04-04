@@ -305,6 +305,7 @@ function loadActiveFinalExam(): QuizQuestion[] {
 const ACTIVE_COURSE = loadActiveCourse()
 const ACTIVE_QUIZZES = loadActiveQuizzes()
 const ACTIVE_FINAL_EXAM = loadActiveFinalExam()
+const EEO_EXAM_PATH = `/${COURSE.id}` // '/eeo-investigator'
 
 const ALL_LESSONS = ACTIVE_COURSE.sections.flatMap((s) => s.lessons)
 
@@ -340,8 +341,29 @@ function useCompletion() {
 
 // ─── Catalog Page ─────────────────────────────────────────────────────────────
 
+// Dashboard shortcuts now align with owned-exams access (any ExamAccess row),
+// not the legacy single-exam paid flag.
+function useHasOwnedExams(): boolean {
+  const { isLoaded: clerkLoaded, isSignedIn } = useUser()
+  const { getToken } = useAuth()
+  const [hasExams, setHasExams] = useState(false)
+
+  useEffect(() => {
+    if (!clerkLoaded || !isSignedIn) return
+    const base = import.meta.env.VITE_API_URL ?? ''
+    getToken().then((token) => {
+      fetch(`${base}/my-exams`, { headers: { Authorization: `Bearer ${token}` } })
+        .then((r) => r.json())
+        .then((exams: ExamEntry[]) => setHasExams(exams.length > 0))
+        .catch(() => {})
+    })
+  }, [clerkLoaded, isSignedIn, getToken])
+
+  return hasExams
+}
+
 function CatalogPage() {
-  const { paid } = useCompletion()
+  const hasOwnedExams = useHasOwnedExams()
 
   return (
     <>
@@ -354,7 +376,7 @@ function CatalogPage() {
 
         <main>
           <SignedIn>
-            {paid && (
+            {hasOwnedExams && (
               <p style={{ fontFamily: 'var(--font-ui)', fontSize: '0.875rem', marginBottom: 'var(--sp-4)' }}>
                 <Link to="/dashboard" style={{ color: 'var(--text-secondary)', textDecoration: 'underline' }}>Go to your Dashboard</Link>
               </p>
@@ -362,12 +384,12 @@ function CatalogPage() {
           </SignedIn>
           <p className="home-cta-desc" style={{ marginBottom: 'var(--sp-6)' }}>Choose a certification path to get started.</p>
           <div className="info-panel info-panel--warm info-panel--featured" style={{ marginBottom: 'var(--sp-6)' }}>
-            <p className="info-panel__title">EEO Investigator Certification</p>
+            <p className="info-panel__title">{COURSE.title}</p>
             <p className="home-cta-desc">
               Earn a verifiable certification in federal equal employment opportunity law and complaint investigation.
             </p>
             <p style={{ fontFamily: 'var(--font-ui)', fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: 'var(--sp-2)' }}>Available for new certification or CEU renewal.</p>
-            <Link to="/eeo-investigator" className="btn-primary" style={{ display: 'inline-block', marginTop: 'var(--sp-4)' }}>View Certification</Link>
+            <Link to={EEO_EXAM_PATH} className="btn-primary" style={{ display: 'inline-block', marginTop: 'var(--sp-4)' }}>View Certification</Link>
           </div>
 
           <p className="home-verify-link">
@@ -389,7 +411,8 @@ function CatalogPage() {
 // ─── EEO Investigator Detail Page ─────────────────────────────────────────────
 
 function EeoDetailPage() {
-  const { paid } = useCompletion()
+  // Existing owners are routed to dashboard based on owned-exam access, not legacy paid status.
+  const hasOwnedExams = useHasOwnedExams()
   const { user } = useUser()
   const [purchasing, setPurchasing] = useState(false)
 
@@ -421,7 +444,7 @@ function EeoDetailPage() {
       </header>
 
       <main>
-        <h2 className="home-cta-title">EEO Investigator Certification</h2>
+        <h2 className="home-cta-title">{COURSE.title}</h2>
         <p className="home-cta-desc">
           Complete a self-paced training program and earn a verifiable certification in federal equal employment opportunity law and complaint investigation.
         </p>
@@ -431,18 +454,14 @@ function EeoDetailPage() {
           <h3 style={{ fontFamily: 'var(--font-ui)', fontSize: '1rem', fontWeight: 600, marginBottom: 'var(--sp-1)', color: 'var(--text-primary)' }}>Get Certified</h3>
           <p style={{ fontFamily: 'var(--font-ui)', fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: 'var(--sp-3)' }}>Complete the full training and final exam to earn your certification.</p>
           <SignedOut>
-            {paid ? (
-              <Link to="/sign-in" className="btn-primary">Log In</Link>
-            ) : (
-              <div className="home-btn-row">
-                <Link to="/sign-up" className="btn-primary">Start Certification</Link>
-                <Link to="/sign-in" className="btn-secondary">Log In</Link>
-              </div>
-            )}
+            <div className="home-btn-row">
+              <Link to="/sign-up" className="btn-primary">Start Certification</Link>
+              <Link to="/sign-in" className="btn-secondary">Log In</Link>
+            </div>
           </SignedOut>
 
           <SignedIn>
-            {paid ? (
+            {hasOwnedExams ? (
               <div>
                 <p style={{ fontFamily: 'var(--font-ui)', fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: 'var(--sp-3)' }}>Manage your certification progress, renewal, and access from your dashboard.</p>
                 <Link to="/dashboard" className="btn-primary">Go to Dashboard</Link>
@@ -467,8 +486,8 @@ function EeoDetailPage() {
           </SignedIn>
         </div>
 
-        {/* ── Section 2: Renew Certification (CEU) — hidden for paid users ── */}
-        {!paid && (
+        {/* ── Section 2: Renew Certification (CEU) — hidden for owners who use dashboard ── */}
+        {!hasOwnedExams && (
           <div style={{ marginBottom: 'var(--sp-6)' }}>
             <h3 style={{ fontFamily: 'var(--font-ui)', fontSize: '1rem', fontWeight: 600, marginBottom: 'var(--sp-1)', color: 'var(--text-primary)' }}>Renew Certification (CEU)</h3>
             <p style={{ fontFamily: 'var(--font-ui)', fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: 'var(--sp-1)' }}>Complete the renewal course and exam to extend your certification.</p>
@@ -496,32 +515,52 @@ function EeoDetailPage() {
 
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 
+// Dashboard card rendering is now data-driven from owned exams via /my-exams.
+// Route/actions are still EEO-first for this phase — non-EEO exams render info only.
+type ExamEntry = {
+  examId: string
+  examTitle: string
+  examSlug: string
+  purchasedAt: string
+  ceuAccessUntil: string | null
+  certification: { issuedAt: string; expiresAt: string; renewedAt: string | null } | null
+}
+
+function ceuStatusText(ceuAccessUntil: string | null): string {
+  if (!ceuAccessUntil) return ''
+  const until = new Date(ceuAccessUntil)
+  const now = new Date()
+  if (until <= now) return 'CEU access expired — renew to continue'
+  const days = Math.ceil((until.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+  return `CEU access: ${days} day${days === 1 ? '' : 's'} remaining`
+}
+
+function certStatusText(certification: ExamEntry['certification']): string {
+  if (!certification?.expiresAt) return ''
+  const expires = new Date(certification.expiresAt)
+  const renewed = certification.renewedAt ? ' (renewed)' : ''
+  return `Certification active until ${expires.toLocaleDateString()}${renewed}`
+}
+
 function DashboardPage() {
   const { user } = useUser()
+  const { getToken } = useAuth()
   const { completed, quizResults } = useCompletion()
   const totalLessons = ACTIVE_COURSE.sections.reduce((sum, s) => sum + s.lessons.length, 0)
   const quizzesPassed = ACTIVE_COURSE.sections.filter((s) => quizResults[s.id] === 'passed').length
 
-  const [ceuStatusText, setCeuStatusText] = useState("")
+  const [myExams, setMyExams] = useState<ExamEntry[]>([])
 
   useEffect(() => {
     if (!user?.id) return
     const base = import.meta.env.VITE_API_URL ?? ''
-    fetch(`${base}/payment-status?clerkUserId=${user.id}`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (!data.ceuAccessUntil) return
-        const until = new Date(data.ceuAccessUntil)
-        const now = new Date()
-        if (until <= now) {
-          setCeuStatusText('CEU access expired — renew to continue')
-        } else {
-          const days = Math.ceil((until.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
-          setCeuStatusText(`CEU access: ${days} day${days === 1 ? '' : 's'} remaining`)
-        }
-      })
-      .catch(() => {})
-  }, [user?.id])
+    getToken().then((token) => {
+      fetch(`${base}/my-exams`, { headers: { Authorization: `Bearer ${token}` } })
+        .then((r) => r.json())
+        .then((exams: ExamEntry[]) => setMyExams(exams))
+        .catch(() => {})
+    })
+  }, [user?.id, getToken])
 
   return (
     <div className="page-shell">
@@ -533,26 +572,46 @@ function DashboardPage() {
 
       <hr className="dash-divider" />
 
-      <div
-        className="info-panel info-panel--warm info-panel--featured"
-        style={{ marginBottom: ceuStatusText ? 'var(--sp-3)' : 'var(--sp-6)' }}
-      >
-        <p className="info-panel__title">EEO Investigator Certification</p>
-        <p className="dash-course-desc">
-          A structured program covering federal equal employment opportunity law,
-          complaint investigation procedures, and agency compliance standards.
-        </p>
-        <p className="dash-course-progress">
-          {completed.size} of {totalLessons} lessons completed
-          {quizzesPassed > 0 &&
-            ` · ${quizzesPassed} of ${ACTIVE_COURSE.sections.length} section quizzes passed`}
-        </p>
-      </div>
+      {myExams.map((exam) => {
+        const ceuText = ceuStatusText(exam.ceuAccessUntil)
+        const certText = certStatusText(exam.certification)
+        const isEeo = exam.examSlug === COURSE.id
 
-      {ceuStatusText && <p style={{ fontFamily: 'var(--font-ui)', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>{ceuStatusText}</p>}
+        return (
+          <div key={exam.examId}>
+            <div
+              className="info-panel info-panel--warm info-panel--featured"
+              style={{ marginBottom: ceuText ? 'var(--sp-3)' : 'var(--sp-6)' }}
+            >
+              <p className="info-panel__title">{exam.examTitle}</p>
+              {isEeo && (
+                <p className="dash-course-desc">
+                  A structured program covering federal equal employment opportunity law,
+                  complaint investigation procedures, and agency compliance standards.
+                </p>
+              )}
+              {certText && <p className="dash-course-progress">{certText}</p>}
+              {isEeo && (
+                <p className="dash-course-progress">
+                  {completed.size} of {totalLessons} lessons completed
+                  {quizzesPassed > 0 &&
+                    ` · ${quizzesPassed} of ${ACTIVE_COURSE.sections.length} section quizzes passed`}
+                </p>
+              )}
+            </div>
+
+            {ceuText && <p style={{ fontFamily: 'var(--font-ui)', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>{ceuText}</p>}
+            {isEeo && (
+              <div className="action-row" style={{ marginBottom: 'var(--sp-6)' }}>
+                <Link to="/course" className="link-btn">View Course</Link>
+                <Link to="/ceu" className="btn-primary">Renew Certification</Link>
+              </div>
+            )}
+          </div>
+        )
+      })}
+
       <div className="action-row">
-        <Link to="/course" className="link-btn">View Course</Link>
-        <Link to="/ceu" className="btn-primary">Renew Certification</Link>
         <SignOutButton />
       </div>
     </div>
@@ -1077,8 +1136,8 @@ function FinalExamPage() {
 function CeuPage() {
   const { user } = useUser()
   const { getToken } = useAuth()
+  // CEU flow is now keyed server-side by authenticated user + exam. certId is no longer needed in the browser.
   const [searchParams] = useSearchParams()
-  const certId = searchParams.get('certId')
   const returnType = searchParams.get('type')
   const justPaid = returnType === 'paid'
 
@@ -1097,14 +1156,13 @@ function CeuPage() {
 
   useEffect(() => {
     if (justPaid) { setAllowed(true); setAccessChecked(true); return }
-    const url = certId ? `/ceu-access?certId=${encodeURIComponent(certId)}` : '/ceu-access'
     getToken().then((token) => {
-      fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+      fetch('/ceu-access', { headers: { Authorization: `Bearer ${token}` } })
         .then((r) => r.json())
         .then((data) => { setAllowed(!!data.allowed); setAccessChecked(true) })
         .catch(() => setAccessChecked(true))
     })
-  }, [certId, justPaid, getToken])
+  }, [justPaid, getToken])
 
   const [currentIndex, setCurrentIndex] = useState(0)
   const [answers, setAnswers] = useState<(number | null)[]>(
@@ -1134,7 +1192,7 @@ function CeuPage() {
               const res = await fetch(`${base}/create-ceu-checkout-session`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                body: JSON.stringify({ certId }),
+                body: JSON.stringify({}),
               })
               const text = await res.text()
               let data: any = {}
@@ -1255,12 +1313,11 @@ function CeuPage() {
             const passed = correct / CEU_QUESTIONS.length >= 0.8
 
             if (passed && user?.id) {
-              // Trigger CEU renewal on pass (certId may be null for external users)
               try {
                 await fetch('/ceu-complete', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ clerkUserId: user.id, certId }),
+                  body: JSON.stringify({ clerkUserId: user.id }),
                 })
               } catch (err) {
                 console.error('Failed to record CEU renewal:', err)
@@ -1331,7 +1388,7 @@ function CertificatePage() {
           has successfully completed the course
         </p>
 
-        <p className="certificate-course">EEO Investigator Certification</p>
+        <p className="certificate-course">{COURSE.title}</p>
 
         <hr className="certificate-divider" />
 
@@ -1489,10 +1546,33 @@ function PaidGuard({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
+// Dashboard access is now based on owned exams, not the legacy single-exam paid flag.
+// Fetches /my-exams and allows access when the user owns at least one exam.
+function OwnedExamsGuard({ children }: { children: React.ReactNode }) {
+  const { isLoaded: clerkLoaded, isSignedIn } = useUser()
+  const { getToken } = useAuth()
+  const [hasExams, setHasExams] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    if (!clerkLoaded || !isSignedIn) return
+    const base = import.meta.env.VITE_API_URL ?? ''
+    getToken().then((token) => {
+      fetch(`${base}/my-exams`, { headers: { Authorization: `Bearer ${token}` } })
+        .then((r) => r.json())
+        .then((exams: ExamEntry[]) => setHasExams(exams.length > 0))
+        .catch(() => setHasExams(false))
+    })
+  }, [clerkLoaded, isSignedIn, getToken])
+
+  if (!clerkLoaded || !isSignedIn || hasExams === null) return null
+  if (!hasExams) return <Navigate to="/" replace />
+  return <>{children}</>
+}
+
 function ProtectedDashboard() {
   return (
     <>
-      <SignedIn><DashboardPage /></SignedIn>
+      <SignedIn><OwnedExamsGuard><DashboardPage /></OwnedExamsGuard></SignedIn>
       <SignedOut><Navigate to="/sign-in" replace /></SignedOut>
     </>
   )
@@ -1646,7 +1726,7 @@ export default function App() {
     >
       <Routes>
         <Route path="/" element={<CatalogPage />} />
-        <Route path="/eeo-investigator" element={<EeoDetailPage />} />
+        <Route path={EEO_EXAM_PATH} element={<EeoDetailPage />} />
         <Route path="/sign-in/*" element={<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 'var(--sp-10)' }}><div style={{ width: 'fit-content' }}><Link to="/" className="page-back-link" style={{ display: 'inline-block', marginBottom: '12px', color: 'var(--text-secondary)', fontWeight: 600, textDecoration: 'underline' }}>← Back to Home</Link><SignIn routing="path" path="/sign-in" /></div></div>} />
         <Route path="/sign-up/*" element={<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 'var(--sp-10)' }}><div style={{ width: 'fit-content' }}><Link to="/" className="page-back-link" style={{ display: 'inline-block', marginBottom: '12px', color: 'var(--text-secondary)', fontWeight: 600, textDecoration: 'underline' }}>← Back to Home</Link><SignUp routing="path" path="/sign-up" /></div></div>} />
         <Route path="/dashboard" element={<ProtectedDashboard />} />
