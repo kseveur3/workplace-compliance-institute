@@ -305,6 +305,7 @@ function loadActiveFinalExam(): QuizQuestion[] {
 const ACTIVE_COURSE = loadActiveCourse()
 const ACTIVE_QUIZZES = loadActiveQuizzes()
 const ACTIVE_FINAL_EXAM = loadActiveFinalExam()
+const EEO_EXAM_PATH = `/${COURSE.id}` // '/eeo-investigator'
 
 const ALL_LESSONS = ACTIVE_COURSE.sections.flatMap((s) => s.lessons)
 
@@ -362,12 +363,12 @@ function CatalogPage() {
           </SignedIn>
           <p className="home-cta-desc" style={{ marginBottom: 'var(--sp-6)' }}>Choose a certification path to get started.</p>
           <div className="info-panel info-panel--warm info-panel--featured" style={{ marginBottom: 'var(--sp-6)' }}>
-            <p className="info-panel__title">EEO Investigator Certification</p>
+            <p className="info-panel__title">{COURSE.title}</p>
             <p className="home-cta-desc">
               Earn a verifiable certification in federal equal employment opportunity law and complaint investigation.
             </p>
             <p style={{ fontFamily: 'var(--font-ui)', fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: 'var(--sp-2)' }}>Available for new certification or CEU renewal.</p>
-            <Link to="/eeo-investigator" className="btn-primary" style={{ display: 'inline-block', marginTop: 'var(--sp-4)' }}>View Certification</Link>
+            <Link to={EEO_EXAM_PATH} className="btn-primary" style={{ display: 'inline-block', marginTop: 'var(--sp-4)' }}>View Certification</Link>
           </div>
 
           <p className="home-verify-link">
@@ -421,7 +422,7 @@ function EeoDetailPage() {
       </header>
 
       <main>
-        <h2 className="home-cta-title">EEO Investigator Certification</h2>
+        <h2 className="home-cta-title">{COURSE.title}</h2>
         <p className="home-cta-desc">
           Complete a self-paced training program and earn a verifiable certification in federal equal employment opportunity law and complaint investigation.
         </p>
@@ -537,7 +538,7 @@ function DashboardPage() {
         className="info-panel info-panel--warm info-panel--featured"
         style={{ marginBottom: ceuStatusText ? 'var(--sp-3)' : 'var(--sp-6)' }}
       >
-        <p className="info-panel__title">EEO Investigator Certification</p>
+        <p className="info-panel__title">{COURSE.title}</p>
         <p className="dash-course-desc">
           A structured program covering federal equal employment opportunity law,
           complaint investigation procedures, and agency compliance standards.
@@ -1329,7 +1330,7 @@ function CertificatePage() {
           has successfully completed the course
         </p>
 
-        <p className="certificate-course">EEO Investigator Certification</p>
+        <p className="certificate-course">{COURSE.title}</p>
 
         <hr className="certificate-divider" />
 
@@ -1644,7 +1645,7 @@ export default function App() {
     >
       <Routes>
         <Route path="/" element={<CatalogPage />} />
-        <Route path="/eeo-investigator" element={<EeoDetailPage />} />
+        <Route path={EEO_EXAM_PATH} element={<EeoDetailPage />} />
         <Route path="/sign-in/*" element={<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 'var(--sp-10)' }}><div style={{ width: 'fit-content' }}><Link to="/" className="page-back-link" style={{ display: 'inline-block', marginBottom: '12px', color: 'var(--text-secondary)', fontWeight: 600, textDecoration: 'underline' }}>← Back to Home</Link><SignIn routing="path" path="/sign-in" /></div></div>} />
         <Route path="/sign-up/*" element={<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 'var(--sp-10)' }}><div style={{ width: 'fit-content' }}><Link to="/" className="page-back-link" style={{ display: 'inline-block', marginBottom: '12px', color: 'var(--text-secondary)', fontWeight: 600, textDecoration: 'underline' }}>← Back to Home</Link><SignUp routing="path" path="/sign-up" /></div></div>} />
         <Route path="/dashboard" element={<ProtectedDashboard />} />
