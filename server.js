@@ -23,6 +23,15 @@ const prisma = new PrismaClient({ adapter });
 
 app.use(cors({ origin: ["http://localhost:5173", "http://localhost:5174"] }));
 
+// ── Exam config ───────────────────────────────────────────────────────────────
+const EEO_EXAM = {
+  id: "exam_eeo_investigator",
+  slug: "eeo-investigator",
+  title: "EEO Investigator Certification",
+  stripePriceId: process.env.STRIPE_PRICE_ID,
+  ceuPriceId: process.env.STRIPE_CEU_PRICE_ID,
+};
+
 // ── Stripe webhook ────────────────────────────────────────────────────────────
 // MUST be registered before express.json(). Stripe signature verification
 // requires the raw request body; express.json() would consume it first.
@@ -139,11 +148,11 @@ app.post(
           // Dual-write: mirror ceuPaidAt into UserCertification if it exists.
           try {
             const userCert = await prisma.userCertification.findUnique({
-              where: { clerkUserId_examId: { clerkUserId, examId: "exam_eeo_investigator" } },
+              where: { clerkUserId_examId: { clerkUserId, examId: EEO_EXAM.id } },
             });
             if (userCert) {
               await prisma.userCertification.update({
-                where: { clerkUserId_examId: { clerkUserId, examId: "exam_eeo_investigator" } },
+                where: { clerkUserId_examId: { clerkUserId, examId: EEO_EXAM.id } },
                 data: { ceuPaidAt: new Date() },
               });
             } else {
@@ -166,8 +175,8 @@ app.post(
           // Dual-write: mirror CEU access window into ExamAccess.
           try {
             await prisma.examAccess.upsert({
-              where: { clerkUserId_examId: { clerkUserId, examId: "exam_eeo_investigator" } },
-              create: { clerkUserId, examId: "exam_eeo_investigator", ceuAccessUntil },
+              where: { clerkUserId_examId: { clerkUserId, examId: EEO_EXAM.id } },
+              create: { clerkUserId, examId: EEO_EXAM.id, ceuAccessUntil },
               update: { ceuAccessUntil },
             });
           } catch (err) {
@@ -199,8 +208,8 @@ app.post(
         // Dual-write: mirror purchase entitlement into ExamAccess.
         try {
           await prisma.examAccess.upsert({
-            where: { clerkUserId_examId: { clerkUserId, examId: "exam_eeo_investigator" } },
-            create: { clerkUserId, examId: "exam_eeo_investigator" },
+            where: { clerkUserId_examId: { clerkUserId, examId: EEO_EXAM.id } },
+            create: { clerkUserId, examId: EEO_EXAM.id },
             update: {},
           });
         } catch (err) {
@@ -226,7 +235,7 @@ app.post("/create-checkout-session", async (req, res) => {
   try {
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
-      line_items: [{ price: process.env.STRIPE_PRICE_ID, quantity: 1 }],
+      line_items: [{ price: EEO_EXAM.stripePriceId, quantity: 1 }],
       success_url: `${process.env.CLIENT_URL || "http://localhost:5173"}/checkout-success`,
       cancel_url: `${process.env.CLIENT_URL || "http://localhost:5173"}/`,
       metadata: { clerkUserId },
@@ -253,10 +262,10 @@ app.post("/create-ceu-checkout-session", clerkMiddleware(), async (req, res) => 
   try {
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
-      line_items: [{ price: process.env.STRIPE_CEU_PRICE_ID, quantity: 1 }],
+      line_items: [{ price: EEO_EXAM.ceuPriceId, quantity: 1 }],
       success_url: successUrl,
       cancel_url: cancelUrl,
-      metadata: { clerkUserId, examId: "exam_eeo_investigator", productType: "ceu" },
+      metadata: { clerkUserId, examId: EEO_EXAM.id, productType: "ceu" },
     });
     res.json({ url: session.url });
   } catch (err) {
@@ -276,7 +285,7 @@ app.post("/ceu-complete", clerkMiddleware(), async (req, res) => {
 
   try {
     const userCert = await prisma.userCertification.findUnique({
-      where: { clerkUserId_examId: { clerkUserId, examId: "exam_eeo_investigator" } },
+      where: { clerkUserId_examId: { clerkUserId, examId: EEO_EXAM.id } },
     });
 
     if (userCert?.ceuPaidAt) {
@@ -286,7 +295,7 @@ app.post("/ceu-complete", clerkMiddleware(), async (req, res) => {
       expiresAt.setFullYear(expiresAt.getFullYear() + 1);
 
       await prisma.userCertification.update({
-        where: { clerkUserId_examId: { clerkUserId, examId: "exam_eeo_investigator" } },
+        where: { clerkUserId_examId: { clerkUserId, examId: EEO_EXAM.id } },
         data: { renewedAt: issuedAt, issuedAt, expiresAt, ceuPaidAt: null },
       });
 
@@ -329,7 +338,7 @@ app.get("/ceu-access", clerkMiddleware(), async (req, res) => {
   try {
     // Internal user: has a UserCertification row with ceuPaidAt set → renewal exam unlocked.
     const userCert = await prisma.userCertification.findUnique({
-      where: { clerkUserId_examId: { clerkUserId, examId: "exam_eeo_investigator" } },
+      where: { clerkUserId_examId: { clerkUserId, examId: EEO_EXAM.id } },
     });
     if (userCert?.ceuPaidAt) {
       return res.json({ allowed: true });
@@ -337,7 +346,7 @@ app.get("/ceu-access", clerkMiddleware(), async (req, res) => {
 
     // External user: no UserCertification row — check the 30-day CEU access window.
     const access = await prisma.examAccess.findUnique({
-      where: { clerkUserId_examId: { clerkUserId, examId: "exam_eeo_investigator" } },
+      where: { clerkUserId_examId: { clerkUserId, examId: EEO_EXAM.id } },
     });
     const allowed = !!(access?.ceuAccessUntil && access.ceuAccessUntil > new Date());
     res.json({ allowed });
@@ -356,7 +365,7 @@ app.get("/payment-status", async (req, res) => {
       return res.status(400).json({ error: "clerkUserId is required" });
     }
     const record = await prisma.examAccess.findUnique({
-      where: { clerkUserId_examId: { clerkUserId, examId: "exam_eeo_investigator" } },
+      where: { clerkUserId_examId: { clerkUserId, examId: EEO_EXAM.id } },
     });
     // paid = true only for full certification purchase (ceuAccessUntil is null).
     // CEU-only external users have ceuAccessUntil set and do not get full course access.
@@ -403,7 +412,7 @@ app.get("/my-certification", clerkMiddleware(), async (req, res) => {
   }
   try {
     const cert = await prisma.userCertification.findUnique({
-      where: { clerkUserId_examId: { clerkUserId, examId: "exam_eeo_investigator" } },
+      where: { clerkUserId_examId: { clerkUserId, examId: EEO_EXAM.id } },
       select: { issuedAt: true, expiresAt: true, renewedAt: true },
     });
     res.json(cert ?? null);
