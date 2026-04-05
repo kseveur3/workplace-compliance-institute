@@ -564,6 +564,24 @@ function DashboardPage() {
   const quizzesPassed = ACTIVE_COURSE.sections.filter((s) => quizResults[s.id] === 'passed').length
 
   const [myExams, setMyExams] = useState<ExamEntry[]>([])
+  const [extendingAccess, setExtendingAccess] = useState(false)
+
+  async function handleExtendAccess() {
+    setExtendingAccess(true)
+    try {
+      const base = import.meta.env.VITE_API_URL ?? ''
+      const token = await getToken()
+      const res = await fetch(`${base}/create-extend-access-session`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const data = await res.json()
+      if (data.url) window.location.href = data.url
+      else setExtendingAccess(false)
+    } catch {
+      setExtendingAccess(false)
+    }
+  }
 
   useEffect(() => {
     if (!user?.id) return
@@ -613,6 +631,11 @@ function DashboardPage() {
                 </p>
               )}
               {accessText && !exam.certification && courseAccessActive && <p className="dash-course-progress">{accessText}</p>}
+              {!isCeuOnly && isEeo && !exam.certification && !courseAccessActive && (
+                <p className="dash-course-progress">
+                  Your 60-day course access has expired. Extend access for another 60 days at 50% off to continue and complete your certification.
+                </p>
+              )}
               {!isCeuOnly && isEeo && !exam.certification && (
                 <p className="dash-course-progress">
                   {completed.size} of {totalLessons} lessons completed
@@ -632,9 +655,16 @@ function DashboardPage() {
                 {!isCeuOnly && !exam.certification && courseAccessActive && (
                   <Link to="/course" className="btn-primary">View Course</Link>
                 )}
-                {/* Full-course, not yet certified, access expired: non-clickable explanation */}
+                {/* Full-course, not yet certified, access expired: offer extension purchase */}
                 {!isCeuOnly && !exam.certification && !courseAccessActive && (
-                  <span className="btn-primary btn-primary--disabled">Course Access Expired</span>
+                  <button
+                    className="btn-teal"
+                    onClick={handleExtendAccess}
+                    disabled={extendingAccess}
+                    style={{ opacity: extendingAccess ? 0.7 : 1 }}
+                  >
+                    {extendingAccess ? 'Redirecting…' : 'Extend Course Access'}
+                  </button>
                 )}
                 {/* Certified user: show View Course only if still within 60-day window */}
                 {!isCeuOnly && exam.certification && courseAccessActive && (

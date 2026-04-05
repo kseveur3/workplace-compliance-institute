@@ -30,6 +30,7 @@ const EEO_EXAM = {
   title: "EEO Investigator Certification",
   stripePriceId: process.env.STRIPE_PRICE_ID,
   ceuPriceId: process.env.STRIPE_CEU_PRICE_ID,
+  extendPriceId: process.env.STRIPE_EXTEND_PRICE_ID,
 };
 
 // ── Stripe webhook ────────────────────────────────────────────────────────────
@@ -183,6 +184,16 @@ app.post(
             console.error("[dual-write] ExamAccess CEU upsert failed:", err.message);
           }
         }
+      } else if (session.metadata?.productType === "extend_access") {
+        // Access extension purchase: reset the 60-day course window without
+        // creating new certification records or touching CEU state.
+        const examId = session.metadata?.examId ?? EEO_EXAM.id;
+        await prisma.examAccess.upsert({
+          where: { clerkUserId_examId: { clerkUserId, examId } },
+          create: { clerkUserId, examId, ceuAccessUntil: null },
+          update: { purchasedAt: new Date(), ceuAccessUntil: null },
+        });
+        console.log("Course access extended (60 days reset) for:", clerkUserId, "examId:", examId);
       } else {
         // Full certification purchase.
         await prisma.paidUser.upsert({
@@ -266,6 +277,29 @@ app.post("/create-ceu-checkout-session", clerkMiddleware(), async (req, res) => 
       success_url: successUrl,
       cancel_url: cancelUrl,
       metadata: { clerkUserId, examId: EEO_EXAM.id, productType: "ceu" },
+    });
+    res.json({ url: session.url });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Extend course access checkout session creation ────────────────────────────
+app.post("/create-extend-access-session", clerkMiddleware(), async (req, res) => {
+  const { userId: clerkUserId } = getAuth(req);
+  if (!clerkUserId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  const CLIENT_URL = process.env.CLIENT_URL || "http://localhost:5173";
+
+  try {
+    const session = await stripe.checkout.sessions.create({
+      mode: "payment",
+      line_items: [{ price: EEO_EXAM.extendPriceId, quantity: 1 }],
+      success_url: `${CLIENT_URL}/checkout-success`,
+      cancel_url: `${CLIENT_URL}/dashboard`,
+      metadata: { clerkUserId, examId: EEO_EXAM.id, productType: "extend_access" },
     });
     res.json({ url: session.url });
   } catch (err) {
