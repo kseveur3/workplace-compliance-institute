@@ -935,6 +935,42 @@ app.post("/api/admin/scan-ceu-updates", async (req, res) => {
   });
 });
 
+// ── Public certificate verification ──────────────────────────────────────────
+// No authentication required — designed to be called by anyone verifying a cert.
+app.get("/verify", async (req, res) => {
+  const { certificateId } = req.query;
+  if (!certificateId || typeof certificateId !== "string" || !certificateId.trim()) {
+    return res.status(400).json({ error: "certificateId is required" });
+  }
+  try {
+    const cert = await prisma.userCertification.findUnique({
+      where: { certificateId: certificateId.trim().toUpperCase() },
+      select: {
+        certificateId: true,
+        fullName: true,
+        issuedAt: true,
+        expiresAt: true,
+        exam: { select: { title: true } },
+      },
+    });
+    if (!cert) {
+      return res.status(404).json({ error: "Certificate not found" });
+    }
+    const status = cert.expiresAt > new Date() ? "Valid" : "Expired";
+    res.json({
+      certificateId: cert.certificateId,
+      fullName: cert.fullName,
+      examTitle: cert.exam.title,
+      issuedAt: cert.issuedAt,
+      expiresAt: cert.expiresAt,
+      status,
+    });
+  } catch (err) {
+    console.error("[/verify]", err.message);
+    res.status(500).json({ error: "Verification lookup failed" });
+  }
+});
+
 // ── SPA fallback ──────────────────────────────────────────────────────────────
 app.get("*", (_req, res) => {
   res.sendFile(join(__dirname, "dist", "index.html"));

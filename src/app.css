@@ -990,6 +990,11 @@ button {
   color: var(--text-inverse);
   box-shadow: var(--shadow-sm);
 }
+.btn-primary--disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
+}
 
 .btn-secondary {
   display: inline-flex;

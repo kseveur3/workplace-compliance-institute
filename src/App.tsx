@@ -389,7 +389,7 @@ function CatalogPage() {
           <div className="info-panel info-panel--warm info-panel--featured" style={{ marginBottom: 'var(--sp-6)' }}>
             <p className="info-panel__title">{COURSE.title}</p>
             <p className="home-cta-desc">
-              Earn a verifiable certification in federal equal employment opportunity law and complaint investigation.
+              Earn a verifiable certification in federal equal employment opportunity law and complaint investigation. Each certificate includes a unique ID employers can verify instantly online.
             </p>
             <p style={{ fontFamily: 'var(--font-ui)', fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: 'var(--sp-2)' }}>Available for new certification or CEU renewal.</p>
             <Link to={EEO_EXAM_PATH} className="btn-primary" style={{ display: 'inline-block', marginTop: 'var(--sp-4)' }}>View Certification</Link>
@@ -455,8 +455,9 @@ function EeoDetailPage() {
         {/* ── Section 1: Get Certified ── */}
         <div style={{ marginBottom: 'var(--sp-8)' }}>
           <h3 style={{ fontFamily: 'var(--font-ui)', fontSize: '1rem', fontWeight: 600, marginBottom: 'var(--sp-1)', color: 'var(--text-primary)' }}>Get Certified</h3>
-          <p style={{ fontFamily: 'var(--font-ui)', fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: 'var(--sp-1)' }}>Complete the full training and final exam to earn your certification.</p>
-          <p style={{ fontFamily: 'var(--font-ui)', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 'var(--sp-3)' }}>Course access is valid for 60 days from purchase. Certification is valid for 1 year after passing the final exam.</p>
+          <p style={{ fontFamily: 'var(--font-ui)', fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: 'var(--sp-1)' }}>Complete the full training and final exam to earn your certification, including a unique certificate ID employers can verify online.</p>
+          <p style={{ fontFamily: 'var(--font-ui)', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 'var(--sp-1)' }}>Course access is valid for 60 days from purchase. Certification is valid for 1 year after passing the final exam.</p>
+          <p style={{ fontFamily: 'var(--font-ui)', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 'var(--sp-3)' }}>Includes instant certificate verification for employers.</p>
           <SignedOut>
             <div className="home-btn-row">
               <Link to="/sign-up" className="btn-primary">Start Certification</Link>
@@ -558,7 +559,7 @@ function courseAccessText(purchasedAt: string): string {
 function DashboardPage() {
   const { user } = useUser()
   const { getToken } = useAuth()
-  const { completed, quizResults } = useCompletion()
+  const { completed, quizResults, courseAccessActive } = useCompletion()
   const totalLessons = ACTIVE_COURSE.sections.reduce((sum, s) => sum + s.lessons.length, 0)
   const quizzesPassed = ACTIVE_COURSE.sections.filter((s) => quizResults[s.id] === 'passed').length
 
@@ -587,39 +588,62 @@ function DashboardPage() {
 
       {myExams.map((exam) => {
         const isEeo = exam.examSlug === COURSE.id
+        const isCeuOnly = exam.ceuAccessUntil !== null && exam.certification === null
         const ceuText = ceuStatusText(exam.ceuAccessUntil)
         const certText = certStatusText(exam.certification)
-        const accessText = isEeo ? courseAccessText(exam.purchasedAt) : ''
+        const accessText = (!isCeuOnly && isEeo) ? courseAccessText(exam.purchasedAt) : ''
 
         return (
           <div key={exam.examId}>
             <div
               className="info-panel info-panel--warm info-panel--featured"
-              style={{ marginBottom: ceuText ? 'var(--sp-3)' : 'var(--sp-6)' }}
+              style={{ marginBottom: 'var(--sp-6)' }}
             >
               <p className="info-panel__title">{exam.examTitle}</p>
-              {isEeo && (
+              {isEeo && !isCeuOnly && (
                 <p className="dash-course-desc">
                   A structured program covering federal equal employment opportunity law,
                   complaint investigation procedures, and agency compliance standards.
                 </p>
               )}
               {certText && <p className="dash-course-progress">{certText}</p>}
-              {accessText && <p className="dash-course-progress">{accessText}</p>}
-              {isEeo && (
+              {isCeuOnly && (
+                <p className="dash-course-progress" style={{ color: 'var(--text-muted)' }}>
+                  CEU renewal access only — full course lessons are not included.
+                </p>
+              )}
+              {accessText && !exam.certification && courseAccessActive && <p className="dash-course-progress">{accessText}</p>}
+              {!isCeuOnly && isEeo && !exam.certification && (
                 <p className="dash-course-progress">
                   {completed.size} of {totalLessons} lessons completed
                   {quizzesPassed > 0 &&
                     ` · ${quizzesPassed} of ${ACTIVE_COURSE.sections.length} section quizzes passed`}
                 </p>
               )}
+              {ceuText && <p className="dash-course-progress">{ceuText}</p>}
             </div>
-
-            {ceuText && <p style={{ fontFamily: 'var(--font-ui)', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>{ceuText}</p>}
             {isEeo && (
               <div className="action-row" style={{ marginBottom: 'var(--sp-6)' }}>
-                <Link to="/course" className="link-btn">View Course</Link>
-                <Link to="/ceu" className="btn-primary">Renew Certification</Link>
+                {/* CEU-only: single primary action — Renew Certification */}
+                {isCeuOnly && (
+                  <Link to="/ceu" className="btn-primary">Renew Certification</Link>
+                )}
+                {/* Full-course, not yet certified, access active: primary action is the course */}
+                {!isCeuOnly && !exam.certification && courseAccessActive && (
+                  <Link to="/course" className="btn-primary">View Course</Link>
+                )}
+                {/* Full-course, not yet certified, access expired: non-clickable explanation */}
+                {!isCeuOnly && !exam.certification && !courseAccessActive && (
+                  <span className="btn-primary btn-primary--disabled">Course Access Expired</span>
+                )}
+                {/* Certified user: show View Course only if still within 60-day window */}
+                {!isCeuOnly && exam.certification && courseAccessActive && (
+                  <Link to="/course" className="link-btn">View Course</Link>
+                )}
+                {/* Certified user: always show Renew Certification */}
+                {!isCeuOnly && exam.certification && (
+                  <Link to="/ceu" className="btn-primary">Renew Certification</Link>
+                )}
               </div>
             )}
           </div>
@@ -1539,86 +1563,168 @@ function CertificatePage() {
         <p className="certificate-date">Issued {date}</p>
 
         {certificateId && (
-          <p style={{ fontFamily: 'var(--font-ui)', fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 'var(--sp-4)', letterSpacing: '0.04em' }}>
-            Certificate ID: {certificateId}
-          </p>
+          <div style={{ marginTop: 'var(--sp-6)', borderTop: '1px solid var(--border)', paddingTop: 'var(--sp-4)' }}>
+            <p style={{ fontFamily: 'var(--font-ui)', fontSize: '0.7rem', color: 'var(--text-muted)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 'var(--sp-1)' }}>
+              Certificate ID
+            </p>
+            <p style={{ fontFamily: 'var(--font-mono, monospace)', fontSize: '0.875rem', color: 'var(--text-primary)', fontWeight: 600, letterSpacing: '0.06em', marginBottom: 'var(--sp-2)' }}>
+              {certificateId}
+            </p>
+            <p style={{ fontFamily: 'var(--font-ui)', fontSize: '0.7rem', color: 'var(--text-muted)', letterSpacing: '0.02em' }}>
+              Verify at workplacecomplianceinstitute.com/verify?certificateId={certificateId}
+            </p>
+          </div>
         )}
       </div>
+
+      {certificateId && (
+        <div className="no-print" style={{ marginTop: 'var(--sp-6)', padding: 'var(--sp-4) var(--sp-5)', background: 'var(--bg-warm)', border: '1px solid var(--border)', borderRadius: 'var(--r-lg)', fontFamily: 'var(--font-ui)', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+          <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Certificate ID: {certificateId}</span>
+          {' '}— Share this ID or{' '}
+          <Link to={`/verify?certificateId=${encodeURIComponent(certificateId)}`} style={{ color: 'var(--navy)', fontWeight: 600 }}>verify instantly</Link>
+          {' '}to confirm authenticity.
+        </div>
+      )}
     </div>
   )
 }
 
 // ─── Verify Page ──────────────────────────────────────────────────────────────
 
-function VerifyPage() {
-  const [email, setEmail] = useState('')
-  const [result, setResult] = useState<
-    { email: string; courseName: string; completionDate: string } | 'not-found' | null
-  >(null)
+type VerifyResult = {
+  certificateId: string
+  fullName: string | null
+  examTitle: string
+  issuedAt: string
+  expiresAt: string
+  status: 'Valid' | 'Expired'
+}
 
-  function handleSubmit(e: { preventDefault(): void }) {
-    e.preventDefault()
-    const records: { email: string; courseName: string; completionDate: string }[] = JSON.parse(
-      localStorage.getItem('wci_certifications') || '[]'
-    )
-    const found = records.find((r) => r.email.toLowerCase() === email.toLowerCase())
-    setResult(found ?? 'not-found')
+function VerifyPage() {
+  const [searchParams] = useSearchParams()
+  const paramId = searchParams.get('certificateId') ?? ''
+  const [certId, setCertId] = useState(paramId)
+  const [result, setResult] = useState<VerifyResult | 'not-found' | 'error' | null>(null)
+  const [loading, setLoading] = useState(false)
+
+  async function runVerify(id: string) {
+    if (!id.trim()) return
+    setLoading(true)
+    setResult(null)
+    try {
+      const base = import.meta.env.VITE_API_URL ?? ''
+      const res = await fetch(`${base}/verify?certificateId=${encodeURIComponent(id.trim())}`)
+      if (res.status === 404) {
+        setResult('not-found')
+      } else if (res.ok) {
+        setResult(await res.json())
+      } else {
+        setResult('error')
+      }
+    } catch {
+      setResult('error')
+    } finally {
+      setLoading(false)
+    }
   }
+
+  // React to certificateId query-param changes (including initial mount).
+  // When paramId is non-empty: sync the input and auto-run verification.
+  // When paramId is empty (param removed): clear the input and result — do not fetch.
+  useEffect(() => {
+    if (paramId) {
+      setCertId(paramId)
+      runVerify(paramId)
+    } else {
+      setCertId('')
+      setResult(null)
+    }
+    // runVerify is defined inside the component but does not depend on any state
+    // that would cause a loop — paramId is the only driver here.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paramId])
+
+  async function handleSubmit(e: { preventDefault(): void }) {
+    e.preventDefault()
+    runVerify(certId)
+  }
+
+  const fmtDate = (iso: string) =>
+    new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
 
   return (
     <div className="verify-shell">
       <Link to="/" className="page-back-link">← Back to Home</Link>
 
       <div className="verify-hero">
-        <h1>Verify Certificate</h1>
-        <p>Enter an email address to confirm certification status.</p>
+        <h1>Verify a Certificate</h1>
+        <p>Enter the certificate ID printed on the certificate to confirm its authenticity and current status.</p>
       </div>
 
       <form onSubmit={handleSubmit} className="verify-form">
         <input
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="Email address"
+          type="text"
+          value={certId}
+          onChange={(e) => setCertId(e.target.value)}
+          placeholder="Certificate ID (e.g. WCI-EEO-A7F3K9)"
           required
           className="verify-input"
         />
-        <button type="submit" className="verify-submit">
-          Check Status
+        <button type="submit" className="verify-submit" disabled={loading}>
+          {loading ? 'Checking…' : 'Verify'}
         </button>
       </form>
 
       {result === 'not-found' && (
         <div className="verify-result verify-result--invalid">
-          <span className="verify-badge verify-badge--invalid">✗ Not Found</span>
-          <p
-            style={{
-              fontFamily: 'var(--font-ui)',
-              fontSize: '0.875rem',
-              color: 'var(--color-error)',
-            }}
-          >
-            No certification found for this email address.
+          <span className="verify-badge verify-badge--invalid">✗ Certificate Not Found</span>
+          <p style={{ fontFamily: 'var(--font-ui)', fontSize: '0.875rem', color: 'var(--color-error)' }}>
+            No certificate was found with that ID. Please check that the ID is entered exactly as printed — it should follow the format <strong>WCI-EEO-XXXXXX</strong> and is case-insensitive.
           </p>
         </div>
       )}
 
-      {result && result !== 'not-found' && (
-        <div className="verify-result verify-result--valid">
-          <span className="verify-badge verify-badge--valid">✓ Verified</span>
+      {result === 'error' && (
+        <div className="verify-result verify-result--invalid">
+          <span className="verify-badge verify-badge--invalid">⚠ Verification Unavailable</span>
+          <p style={{ fontFamily: 'var(--font-ui)', fontSize: '0.875rem', color: 'var(--color-error)' }}>
+            We were unable to complete the verification check. Please try again in a moment.
+          </p>
+        </div>
+      )}
+
+      {result && result !== 'not-found' && result !== 'error' && (
+        <div className={`verify-result ${result.status === 'Valid' ? 'verify-result--valid' : 'verify-result--invalid'}`}>
+          <span className={`verify-badge ${result.status === 'Valid' ? 'verify-badge--valid' : 'verify-badge--invalid'}`}>
+            {result.status === 'Valid' ? '✓ Valid Certificate' : '⚠ Expired Certificate'}
+          </span>
           <table className="verify-detail-table">
             <tbody>
               <tr>
-                <td>Course</td>
-                <td>{result.courseName}</td>
+                <td>Name</td>
+                <td>{result.fullName ?? '—'}</td>
+              </tr>
+              <tr>
+                <td>Certification</td>
+                <td>{result.examTitle}</td>
+              </tr>
+              <tr>
+                <td>Certificate ID</td>
+                <td>{result.certificateId}</td>
+              </tr>
+              <tr>
+                <td>Issued</td>
+                <td>{fmtDate(result.issuedAt)}</td>
+              </tr>
+              <tr>
+                <td>Expires</td>
+                <td>{fmtDate(result.expiresAt)}</td>
               </tr>
               <tr>
                 <td>Status</td>
-                <td style={{ color: 'var(--color-success)', fontWeight: 600 }}>Certified</td>
-              </tr>
-              <tr>
-                <td>Completion Date</td>
-                <td>{result.completionDate}</td>
+                <td style={{ color: result.status === 'Valid' ? 'var(--color-success)' : 'var(--color-error)', fontWeight: 600 }}>
+                  {result.status === 'Valid' ? 'Valid — Certification is current' : 'Expired — Certification is no longer active'}
+                </td>
               </tr>
             </tbody>
           </table>
