@@ -1,251 +1,294 @@
-import { useState, useEffect, useRef, createContext, useContext } from 'react'
-import { AdminAiContentPage } from './pages/admin-ai-content'
-import { Routes, Route, Link, Navigate, useParams, useNavigate, useLocation, useSearchParams } from 'react-router-dom'
-import { SignIn, SignUp, SignedIn, SignedOut, SignOutButton, useUser, useAuth } from '@clerk/clerk-react'
-import './app.css'
+import { useState, useEffect, useRef, createContext, useContext } from "react";
+import { AdminAiContentPage } from "./pages/admin-ai-content";
+import {
+  Routes,
+  Route,
+  Link,
+  Navigate,
+  useParams,
+  useNavigate,
+  useLocation,
+  useSearchParams,
+} from "react-router-dom";
+import {
+  SignIn,
+  SignUp,
+  SignedIn,
+  SignedOut,
+  SignOutButton,
+  useUser,
+  useAuth,
+} from "@clerk/clerk-react";
+import "./app.css";
 
 interface Lesson {
-  id: string
-  title: string
-  estimatedTime: string
-  content: string[]
-  narrationPlaceholder: string
+  id: string;
+  title: string;
+  estimatedTime: string;
+  content: string[];
+  narrationPlaceholder: string;
 }
 
 interface Section {
-  id: string
-  title: string
-  lessons: Lesson[]
+  id: string;
+  title: string;
+  lessons: Lesson[];
 }
 
 interface Course {
-  id: string
-  title: string
-  sections: Section[]
+  id: string;
+  title: string;
+  sections: Section[];
 }
 
 interface QuizQuestion {
-  id: string
-  question: string
-  options: string[]
-  correctIndex: number
+  id: string;
+  question: string;
+  options: string[];
+  correctIndex: number;
 }
 
 interface SectionQuiz {
-  sectionId: string
-  questions: QuizQuestion[]
+  sectionId: string;
+  questions: QuizQuestion[];
 }
 
 const QUIZZES: SectionQuiz[] = [
   {
-    sectionId: 'section-1',
+    sectionId: "section-1",
     questions: [
       {
-        id: 'q1-1',
-        question: 'Which federal agency is primarily responsible for enforcing EEO laws?',
+        id: "q1-1",
+        question:
+          "Which federal agency is primarily responsible for enforcing EEO laws?",
         options: [
-          'Department of Labor',
-          'Equal Employment Opportunity Commission (EEOC)',
-          'Department of Justice',
-          'Office of Personnel Management',
+          "Department of Labor",
+          "Equal Employment Opportunity Commission (EEOC)",
+          "Department of Justice",
+          "Office of Personnel Management",
         ],
         correctIndex: 1,
       },
       {
-        id: 'q1-2',
-        question: 'Which of the following is NOT a protected characteristic under Title VII?',
-        options: ['Race', 'Religion', 'Political affiliation', 'National origin'],
+        id: "q1-2",
+        question:
+          "Which of the following is NOT a protected characteristic under Title VII?",
+        options: [
+          "Race",
+          "Religion",
+          "Political affiliation",
+          "National origin",
+        ],
         correctIndex: 2,
       },
     ],
   },
   {
-    sectionId: 'section-2',
+    sectionId: "section-2",
     questions: [
       {
-        id: 'q2-1',
-        question: 'Disparate treatment occurs when an employer:',
+        id: "q2-1",
+        question: "Disparate treatment occurs when an employer:",
         options: [
-          'Applies a neutral policy that disproportionately impacts a protected group',
-          'Treats an employee less favorably because of a protected characteristic',
-          'Fails to provide a reasonable accommodation',
-          'Retaliates against an employee for filing a complaint',
+          "Applies a neutral policy that disproportionately impacts a protected group",
+          "Treats an employee less favorably because of a protected characteristic",
+          "Fails to provide a reasonable accommodation",
+          "Retaliates against an employee for filing a complaint",
         ],
         correctIndex: 1,
       },
       {
-        id: 'q2-2',
-        question: 'For a hostile work environment claim, the conduct must be:',
+        id: "q2-2",
+        question: "For a hostile work environment claim, the conduct must be:",
         options: [
-          'Intentional and physical in nature',
-          'Reported to HR before it legally qualifies',
-          'Both subjectively and objectively offensive',
-          'Committed only by a direct supervisor',
+          "Intentional and physical in nature",
+          "Reported to HR before it legally qualifies",
+          "Both subjectively and objectively offensive",
+          "Committed only by a direct supervisor",
         ],
         correctIndex: 2,
       },
     ],
   },
-]
+];
 
 const FINAL_EXAM_QUESTIONS: QuizQuestion[] = [
   {
-    id: 'fe-1',
-    question: 'Which federal agency is the primary enforcement body for EEO laws in the United States?',
+    id: "fe-1",
+    question:
+      "Which federal agency is the primary enforcement body for EEO laws in the United States?",
     options: [
-      'Department of Labor',
-      'Office of Personnel Management',
-      'Equal Employment Opportunity Commission (EEOC)',
-      'Department of Justice',
+      "Department of Labor",
+      "Office of Personnel Management",
+      "Equal Employment Opportunity Commission (EEOC)",
+      "Department of Justice",
     ],
     correctIndex: 2,
   },
   {
-    id: 'fe-2',
-    question: 'Title VII of the Civil Rights Act of 1964 prohibits discrimination based on all of the following EXCEPT:',
-    options: ['Race', 'National origin', 'Political affiliation', 'Religion'],
+    id: "fe-2",
+    question:
+      "Title VII of the Civil Rights Act of 1964 prohibits discrimination based on all of the following EXCEPT:",
+    options: ["Race", "National origin", "Political affiliation", "Religion"],
     correctIndex: 2,
   },
   {
-    id: 'fe-3',
-    question: 'In a disparate treatment claim, the burden-shifting framework was established in:',
+    id: "fe-3",
+    question:
+      "In a disparate treatment claim, the burden-shifting framework was established in:",
     options: [
-      'Harris v. Forklift Systems',
-      'McDonnell Douglas Corp. v. Green',
-      'Meritor Savings Bank v. Vinson',
-      'Burlington Industries v. Ellerth',
+      "Harris v. Forklift Systems",
+      "McDonnell Douglas Corp. v. Green",
+      "Meritor Savings Bank v. Vinson",
+      "Burlington Industries v. Ellerth",
     ],
     correctIndex: 1,
   },
   {
-    id: 'fe-4',
-    question: 'A hostile work environment claim requires that the conduct be:',
+    id: "fe-4",
+    question: "A hostile work environment claim requires that the conduct be:",
     options: [
-      'Physical and intentional',
-      'Reported to a supervisor before filing',
-      'Both subjectively and objectively offensive',
-      'Committed only by a supervisor',
+      "Physical and intentional",
+      "Reported to a supervisor before filing",
+      "Both subjectively and objectively offensive",
+      "Committed only by a supervisor",
     ],
     correctIndex: 2,
   },
-]
+];
 
 const CEU_QUESTIONS: QuizQuestion[] = [
   {
-    id: 'ceu-1',
-    question: 'Which federal agency is the primary enforcement body for EEO laws in the United States?',
+    id: "ceu-1",
+    question:
+      "Which federal agency is the primary enforcement body for EEO laws in the United States?",
     options: [
-      'Department of Labor',
-      'Office of Personnel Management',
-      'Equal Employment Opportunity Commission (EEOC)',
-      'Department of Justice',
+      "Department of Labor",
+      "Office of Personnel Management",
+      "Equal Employment Opportunity Commission (EEOC)",
+      "Department of Justice",
     ],
     correctIndex: 2,
   },
   {
-    id: 'ceu-2',
-    question: 'Title VII of the Civil Rights Act of 1964 prohibits discrimination based on all of the following EXCEPT:',
-    options: ['Race', 'National origin', 'Political affiliation', 'Religion'],
+    id: "ceu-2",
+    question:
+      "Title VII of the Civil Rights Act of 1964 prohibits discrimination based on all of the following EXCEPT:",
+    options: ["Race", "National origin", "Political affiliation", "Religion"],
     correctIndex: 2,
   },
   {
-    id: 'ceu-3',
-    question: 'In a disparate treatment claim, the burden-shifting framework was established in:',
+    id: "ceu-3",
+    question:
+      "In a disparate treatment claim, the burden-shifting framework was established in:",
     options: [
-      'Harris v. Forklift Systems',
-      'McDonnell Douglas Corp. v. Green',
-      'Meritor Savings Bank v. Vinson',
-      'Burlington Industries v. Ellerth',
+      "Harris v. Forklift Systems",
+      "McDonnell Douglas Corp. v. Green",
+      "Meritor Savings Bank v. Vinson",
+      "Burlington Industries v. Ellerth",
     ],
     correctIndex: 1,
   },
   {
-    id: 'ceu-4',
-    question: 'A hostile work environment claim requires that the conduct be:',
+    id: "ceu-4",
+    question: "A hostile work environment claim requires that the conduct be:",
     options: [
-      'Physical and intentional',
-      'Reported to a supervisor before filing',
-      'Both subjectively and objectively offensive',
-      'Committed only by a supervisor',
+      "Physical and intentional",
+      "Reported to a supervisor before filing",
+      "Both subjectively and objectively offensive",
+      "Committed only by a supervisor",
     ],
     correctIndex: 2,
   },
-]
+];
 
 const COURSE: Course = {
-  id: 'eeo-investigator',
-  title: 'EEO Investigator Certification',
+  id: "eeo-investigator",
+  title: "EEO Investigator Certification",
   sections: [
     {
-      id: 'section-1',
-      title: 'Section 1: Foundations of EEO Law',
+      id: "section-1",
+      title: "Section 1: Foundations of EEO Law",
       lessons: [
         {
-          id: 'lesson-1',
-          title: 'Overview of EEO Framework',
-          estimatedTime: 'Estimated time: 20 minutes',
+          id: "lesson-1",
+          title: "Overview of EEO Framework",
+          estimatedTime: "Estimated time: 20 minutes",
           content: [
-            'The Equal Employment Opportunity (EEO) framework is a set of federal laws designed to prevent workplace discrimination based on protected characteristics such as race, color, religion, sex, national origin, age, and disability.',
-            'Federal agencies enforce these protections through the Equal Employment Opportunity Commission (EEOC), which receives, investigates, and resolves discrimination complaints filed by employees and applicants.',
-            'As an EEO investigator, your role is to gather facts impartially, apply the relevant legal standards, and produce a report of investigation that serves as the evidentiary record for resolution.',
-            'Understanding the full scope of the EEO framework — including which laws apply, which agencies have jurisdiction, and what remedies are available — is the foundation of effective investigation.',
+            "The Equal Employment Opportunity (EEO) framework is a set of federal laws designed to prevent workplace discrimination based on protected characteristics such as race, color, religion, sex, national origin, age, and disability.",
+            "Federal agencies enforce these protections through the Equal Employment Opportunity Commission (EEOC), which receives, investigates, and resolves discrimination complaints filed by employees and applicants.",
+            "As an EEO investigator, your role is to gather facts impartially, apply the relevant legal standards, and produce a report of investigation that serves as the evidentiary record for resolution.",
+            "Understanding the full scope of the EEO framework — including which laws apply, which agencies have jurisdiction, and what remedies are available — is the foundation of effective investigation.",
           ],
-          narrationPlaceholder: 'Audio narration for Overview of EEO Framework coming soon.',
+          narrationPlaceholder:
+            "Audio narration for Overview of EEO Framework coming soon.",
         },
         {
-          id: 'lesson-2',
-          title: 'Title VII Basics',
-          estimatedTime: 'Estimated time: 25 minutes',
+          id: "lesson-2",
+          title: "Title VII Basics",
+          estimatedTime: "Estimated time: 25 minutes",
           content: [
-            'Title VII of the Civil Rights Act of 1964 prohibits employment discrimination based on race, color, religion, sex, and national origin. It applies to employers with 15 or more employees, including federal agencies.',
-            'Title VII covers all aspects of employment: hiring, firing, pay, job assignments, promotions, layoffs, training, fringe benefits, and any other term or condition of employment.',
+            "Title VII of the Civil Rights Act of 1964 prohibits employment discrimination based on race, color, religion, sex, and national origin. It applies to employers with 15 or more employees, including federal agencies.",
+            "Title VII covers all aspects of employment: hiring, firing, pay, job assignments, promotions, layoffs, training, fringe benefits, and any other term or condition of employment.",
             "Amendments and related statutes — including the Pregnancy Discrimination Act and Title II of the Genetic Information Nondiscrimination Act — have expanded Title VII's protections over time.",
-            'Investigators must be familiar with the basic elements of a Title VII claim, including the concept of adverse action and the requirement that the protected characteristic be a motivating factor in the employment decision.',
+            "Investigators must be familiar with the basic elements of a Title VII claim, including the concept of adverse action and the requirement that the protected characteristic be a motivating factor in the employment decision.",
           ],
-          narrationPlaceholder: 'Audio narration for Title VII Basics coming soon.',
+          narrationPlaceholder:
+            "Audio narration for Title VII Basics coming soon.",
         },
       ],
     },
     {
-      id: 'section-2',
-      title: 'Section 2: Types of Claims',
+      id: "section-2",
+      title: "Section 2: Types of Claims",
       lessons: [
         {
-          id: 'lesson-3',
-          title: 'Disparate Treatment',
-          estimatedTime: 'Estimated time: 20 minutes',
+          id: "lesson-3",
+          title: "Disparate Treatment",
+          estimatedTime: "Estimated time: 20 minutes",
           content: [
-            'Disparate treatment is the most common theory of discrimination. It occurs when an employer treats an employee less favorably than similarly situated employees because of a protected characteristic.',
+            "Disparate treatment is the most common theory of discrimination. It occurs when an employer treats an employee less favorably than similarly situated employees because of a protected characteristic.",
             "To establish a disparate treatment claim, a complainant must show that: they are a member of a protected class, they suffered an adverse employment action, and there is an inference that the action was motivated by discriminatory intent.",
             "Investigators look for comparative evidence — how were employees outside the complainant's protected class treated under similar circumstances? Inconsistencies in disciplinary records, promotions, or performance reviews are key indicators.",
-            'Direct evidence of discriminatory intent, such as a discriminatory statement by a decision-maker, is rare. Most cases rely on circumstantial evidence and the burden-shifting framework established in McDonnell Douglas Corp. v. Green.',
+            "Direct evidence of discriminatory intent, such as a discriminatory statement by a decision-maker, is rare. Most cases rely on circumstantial evidence and the burden-shifting framework established in McDonnell Douglas Corp. v. Green.",
           ],
-          narrationPlaceholder: 'Audio narration for Disparate Treatment coming soon.',
+          narrationPlaceholder:
+            "Audio narration for Disparate Treatment coming soon.",
         },
         {
-          id: 'lesson-4',
-          title: 'Hostile Work Environment',
-          estimatedTime: 'Estimated time: 25 minutes',
+          id: "lesson-4",
+          title: "Hostile Work Environment",
+          estimatedTime: "Estimated time: 25 minutes",
           content: [
-            'A hostile work environment claim arises when an employee is subjected to unwelcome conduct based on a protected characteristic that is severe or pervasive enough to create an abusive working environment.',
-            'The conduct must be both subjectively and objectively offensive — meaning the complainant found it hostile and a reasonable person in the same situation would also find it hostile.',
-            'Investigators must assess the totality of circumstances, including the frequency of the conduct, its severity, whether it was physically threatening or humiliating, and whether it unreasonably interfered with work performance.',
-            'Employer liability depends in part on whether the harasser was a supervisor or co-worker, and whether the employer knew or should have known about the conduct and failed to take prompt corrective action.',
+            "A hostile work environment claim arises when an employee is subjected to unwelcome conduct based on a protected characteristic that is severe or pervasive enough to create an abusive working environment.",
+            "The conduct must be both subjectively and objectively offensive — meaning the complainant found it hostile and a reasonable person in the same situation would also find it hostile.",
+            "Investigators must assess the totality of circumstances, including the frequency of the conduct, its severity, whether it was physically threatening or humiliating, and whether it unreasonably interfered with work performance.",
+            "Employer liability depends in part on whether the harasser was a supervisor or co-worker, and whether the employer knew or should have known about the conduct and failed to take prompt corrective action.",
           ],
-          narrationPlaceholder: 'Audio narration for Hostile Work Environment coming soon.',
+          narrationPlaceholder:
+            "Audio narration for Hostile Work Environment coming soon.",
         },
       ],
     },
   ],
-}
+};
 
 function loadActiveCourse(): Course {
   try {
-    const raw = localStorage.getItem('generatedCertification')
+    const raw = localStorage.getItem("generatedCertification");
     if (raw) {
-      const gen = JSON.parse(raw)
-      console.log('Using generated certification')
-      const sections: Section[] = (gen.lessons as { section: string; lessons: { title: string; estimatedTime: string; content: string[] }[] }[]).map((group, si) => ({
+      const gen = JSON.parse(raw);
+      console.log("Using generated certification");
+      const sections: Section[] = (
+        gen.lessons as {
+          section: string;
+          lessons: {
+            title: string;
+            estimatedTime: string;
+            content: string[];
+          }[];
+        }[]
+      ).map((group, si) => ({
         id: `section-${si + 1}`,
         title: group.section,
         lessons: group.lessons.map((lesson, li) => ({
@@ -255,21 +298,35 @@ function loadActiveCourse(): Course {
           content: lesson.content,
           narrationPlaceholder: `Audio narration for ${lesson.title} coming soon.`,
         })),
-      }))
-      return { id: COURSE.id, title: COURSE.title, sections }
+      }));
+      return { id: COURSE.id, title: COURSE.title, sections };
     }
-  } catch { /* ignore parse errors */ }
-  console.log('Using default COURSE')
-  return COURSE
+  } catch {
+    /* ignore parse errors */
+  }
+  console.log("Using default COURSE");
+  return COURSE;
 }
 
 function loadActiveQuizzes(): SectionQuiz[] {
   try {
-    const raw = localStorage.getItem('generatedCertification')
+    const raw = localStorage.getItem("generatedCertification");
     if (raw) {
-      const gen = JSON.parse(raw)
-      if (Array.isArray(gen.sectionQuizzes) && gen.sectionQuizzes[0]?.questions?.[0]?.question) {
-        return (gen.sectionQuizzes as { section: string; questions: { question: string; options: string[]; correctIndex: number }[] }[]).map((sq, si) => ({
+      const gen = JSON.parse(raw);
+      if (
+        Array.isArray(gen.sectionQuizzes) &&
+        gen.sectionQuizzes[0]?.questions?.[0]?.question
+      ) {
+        return (
+          gen.sectionQuizzes as {
+            section: string;
+            questions: {
+              question: string;
+              options: string[];
+              correctIndex: number;
+            }[];
+          }[]
+        ).map((sq, si) => ({
           sectionId: `section-${si + 1}`,
           questions: sq.questions.map((q, qi) => ({
             id: `gen-q${si + 1}-${qi + 1}`,
@@ -277,52 +334,64 @@ function loadActiveQuizzes(): SectionQuiz[] {
             options: q.options,
             correctIndex: q.correctIndex,
           })),
-        }))
+        }));
       }
     }
-  } catch { /* ignore parse errors */ }
-  return QUIZZES
+  } catch {
+    /* ignore parse errors */
+  }
+  return QUIZZES;
 }
 
 function loadActiveFinalExam(): QuizQuestion[] {
   try {
-    const raw = localStorage.getItem('generatedCertification')
+    const raw = localStorage.getItem("generatedCertification");
     if (raw) {
-      const gen = JSON.parse(raw)
-      if (Array.isArray(gen.finalExam?.questions) && gen.finalExam.questions[0]?.question) {
-        return gen.finalExam.questions.map((q: { question: string; options: string[]; correctIndex: number }, i: number) => ({
-          id: `gen-fe-${i + 1}`,
-          question: q.question,
-          options: q.options,
-          correctIndex: q.correctIndex,
-        }))
+      const gen = JSON.parse(raw);
+      if (
+        Array.isArray(gen.finalExam?.questions) &&
+        gen.finalExam.questions[0]?.question
+      ) {
+        return gen.finalExam.questions.map(
+          (
+            q: { question: string; options: string[]; correctIndex: number },
+            i: number,
+          ) => ({
+            id: `gen-fe-${i + 1}`,
+            question: q.question,
+            options: q.options,
+            correctIndex: q.correctIndex,
+          }),
+        );
       }
     }
-  } catch { /* ignore parse errors */ }
-  return FINAL_EXAM_QUESTIONS
+  } catch {
+    /* ignore parse errors */
+  }
+  return FINAL_EXAM_QUESTIONS;
 }
 
-const ACTIVE_COURSE = loadActiveCourse()
-const ACTIVE_QUIZZES = loadActiveQuizzes()
-const ACTIVE_FINAL_EXAM = loadActiveFinalExam()
-const EEO_EXAM_PATH = `/${COURSE.id}` // '/eeo-investigator'
+const ACTIVE_COURSE = loadActiveCourse();
+const ACTIVE_QUIZZES = loadActiveQuizzes();
+const ACTIVE_FINAL_EXAM = loadActiveFinalExam();
+const EEO_EXAM_PATH = `/${COURSE.id}`; // '/eeo-investigator'
 
-const ALL_LESSONS = ACTIVE_COURSE.sections.flatMap((s) => s.lessons)
+const ALL_LESSONS = ACTIVE_COURSE.sections.flatMap((s) => s.lessons);
 
-type QuizResult = 'passed' | 'failed'
+type QuizResult = "passed" | "failed";
 
 interface CompletionContextValue {
-  completed: Set<string>
-  toggle: (id: string) => void
-  quizResults: Record<string, QuizResult>
-  setQuizResult: (sectionId: string, result: QuizResult) => void
-  finalExamResult: QuizResult | null
-  setFinalExamResult: (result: QuizResult) => void
-  paid: boolean
+  completed: Set<string>;
+  toggle: (id: string) => void;
+  quizResults: Record<string, QuizResult>;
+  setQuizResult: (sectionId: string, result: QuizResult) => void;
+  finalExamResult: QuizResult | null;
+  setFinalExamResult: (result: QuizResult) => void;
+  paid: boolean;
   // courseAccessActive: server-authoritative 60-day course access signal
-  courseAccessActive: boolean
-  paidLoading: boolean
-  refetchPaidStatus: () => void
+  courseAccessActive: boolean;
+  paidLoading: boolean;
+  refetchPaidStatus: () => void;
 }
 
 const CompletionContext = createContext<CompletionContextValue>({
@@ -336,10 +405,10 @@ const CompletionContext = createContext<CompletionContextValue>({
   courseAccessActive: false,
   paidLoading: true,
   refetchPaidStatus: () => {},
-})
+});
 
 function useCompletion() {
-  return useContext(CompletionContext)
+  return useContext(CompletionContext);
 }
 
 // ─── Catalog Page ─────────────────────────────────────────────────────────────
@@ -347,30 +416,567 @@ function useCompletion() {
 // Dashboard shortcuts now align with owned-exams access (any ExamAccess row),
 // not the legacy single-exam paid flag.
 function useHasOwnedExams(): boolean {
-  const { isLoaded: clerkLoaded, isSignedIn } = useUser()
-  const { getToken } = useAuth()
-  const [hasExams, setHasExams] = useState(false)
+  const { isLoaded: clerkLoaded, isSignedIn } = useUser();
+  const { getToken } = useAuth();
+  const [hasExams, setHasExams] = useState(false);
 
   useEffect(() => {
-    if (!clerkLoaded || !isSignedIn) return
-    const base = import.meta.env.VITE_API_URL ?? ''
+    if (!clerkLoaded || !isSignedIn) return;
+    const base = import.meta.env.VITE_API_URL ?? "";
     getToken().then((token) => {
-      fetch(`${base}/my-exams`, { headers: { Authorization: `Bearer ${token}` } })
+      fetch(`${base}/my-exams`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
         .then((r) => r.json())
         .then((exams: ExamEntry[]) => setHasExams(exams.length > 0))
-        .catch(() => {})
-    })
-  }, [clerkLoaded, isSignedIn, getToken])
+        .catch(() => {});
+    });
+  }, [clerkLoaded, isSignedIn, getToken]);
 
-  return hasExams
+  return hasExams;
 }
 
 function CatalogPage() {
-  const hasOwnedExams = useHasOwnedExams()
+  const hasOwnedExams = useHasOwnedExams();
+
+  return (
+    <>
+      <style>{`
+        @media (max-width: 640px) {
+          .catalog-grid { grid-template-columns: 1fr !important; }
+        }
+      `}</style>
+      <div className="home-shell" style={{ maxWidth: "1200px", textAlign: "left", padding: "40px 24px" }}>
+        {/* ── Institutional header with logo ── */}
+        <header
+          style={{
+            background: "#1a2a4a",
+            borderRadius: "10px",
+            padding: "36px 40px",
+            display: "flex",
+            alignItems: "center",
+            gap: "20px",
+            marginBottom: "20px",
+          }}
+        >
+          <img
+            src="/shield-icon-only-main.png"
+            alt="Workplace Compliance Institute"
+            style={{
+              height: "60px",
+              width: "auto",
+              objectFit: "contain",
+              flexShrink: 0,
+            }}
+          />
+          <div>
+            <h1
+              style={{
+                fontFamily: "var(--font-ui)",
+                fontSize: "1.125rem",
+                fontWeight: 600,
+                color: "#ffffff",
+                margin: 0,
+                marginBottom: "4px",
+                letterSpacing: "0.01em",
+              }}
+            >
+              Workplace Compliance Institute
+            </h1>
+            <p
+              style={{
+                fontFamily: "var(--font-ui)",
+                fontSize: "0.7rem",
+                color: "rgba(255,255,255,0.5)",
+                margin: 0,
+                letterSpacing: "0.08em",
+                textTransform: "uppercase",
+              }}
+            >
+              Professional Certification &amp; Training
+            </p>
+          </div>
+        </header>
+
+        {/* ── Page-level trust signals ── */}
+        <div
+          style={{
+            display: "flex",
+            gap: "28px",
+            flexWrap: "wrap",
+            padding: "14px 24px",
+            background: "var(--bg-warm)",
+            border: "1px solid var(--border)",
+            borderRadius: "8px",
+            marginBottom: "24px",
+          }}
+        >
+          {[
+            {
+              label: "Verifiable certificate ID",
+              icon: (
+                <svg
+                  width="13"
+                  height="13"
+                  viewBox="0 0 14 14"
+                  fill="none"
+                  style={{ flexShrink: 0 }}
+                >
+                  <path
+                    d="M7 1.5L2 3.5v3.5c0 2.8 2.2 5.4 5 6 2.8-.6 5-3.2 5-6V3.5L7 1.5z"
+                    stroke="#0d6e59"
+                    strokeWidth="1.2"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M4.5 7.2l1.8 1.8 3.2-3.2"
+                    stroke="#0d6e59"
+                    strokeWidth="1.2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              ),
+            },
+            {
+              label: "Self-paced online training",
+              icon: (
+                <svg
+                  width="13"
+                  height="13"
+                  viewBox="0 0 14 14"
+                  fill="none"
+                  style={{ flexShrink: 0 }}
+                >
+                  <rect
+                    x="1.5"
+                    y="1.5"
+                    width="11"
+                    height="11"
+                    rx="2"
+                    stroke="#1a2a4a"
+                    strokeWidth="1.2"
+                  />
+                  <path
+                    d="M4 7h6M4 4.5h6M4 9.5h3.5"
+                    stroke="#1a2a4a"
+                    strokeWidth="1.2"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              ),
+            },
+            {
+              label: "New cert or CEU renewal",
+              icon: (
+                <svg
+                  width="13"
+                  height="13"
+                  viewBox="0 0 14 14"
+                  fill="none"
+                  style={{ flexShrink: 0 }}
+                >
+                  <circle
+                    cx="7"
+                    cy="7"
+                    r="5.5"
+                    stroke="#1a2a4a"
+                    strokeWidth="1.2"
+                  />
+                  <path
+                    d="M7 4v3.5l2 1.2"
+                    stroke="#1a2a4a"
+                    strokeWidth="1.2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              ),
+            },
+          ].map(({ label, icon }) => (
+            <div
+              key={label}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "7px",
+                fontFamily: "var(--font-ui)",
+                fontSize: "0.75rem",
+                color: "var(--text-secondary)",
+              }}
+            >
+              {icon}
+              {label}
+            </div>
+          ))}
+        </div>
+
+        <main>
+          {/* ── Dashboard shortcut — signed-in owners only ── */}
+          <SignedIn>
+            {hasOwnedExams && (
+              <p
+                style={{
+                  fontFamily: "var(--font-ui)",
+                  fontSize: "0.8rem",
+                  textAlign: "right",
+                  marginBottom: "var(--sp-4)",
+                }}
+              >
+                <Link
+                  to="/dashboard"
+                  style={{
+                    color: "var(--text-secondary)",
+                    textDecoration: "underline",
+                  }}
+                >
+                  Go to your Dashboard →
+                </Link>
+              </p>
+            )}
+          </SignedIn>
+
+          {/* ── Section label ── */}
+          <p
+            style={{
+              fontFamily: "var(--font-ui)",
+              fontSize: "0.65rem",
+              fontWeight: 600,
+              letterSpacing: "0.1em",
+              textTransform: "uppercase",
+              color: "var(--text-muted)",
+              marginBottom: "14px",
+            }}
+          >
+            Certification Tracks
+          </p>
+
+          {/* ── Certification card grid ── */}
+          <div
+            className="catalog-grid"
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+              gap: "28px",
+              marginBottom: "var(--sp-6)",
+            }}
+          >
+            {/* Active card — EEO Investigator Certification */}
+            <div
+              style={{
+                background: "var(--bg-surface, #ffffff)",
+                border: "1px solid var(--border)",
+                borderLeft: "3px solid #0d6e59",
+                borderRadius: "10px",
+                padding: "28px 24px",
+                display: "flex",
+                flexDirection: "column",
+              }}
+            >
+              <span
+                style={{
+                  display: "inline-block",
+                  fontFamily: "var(--font-ui)",
+                  fontSize: "0.625rem",
+                  fontWeight: 600,
+                  letterSpacing: "0.07em",
+                  textTransform: "uppercase",
+                  padding: "3px 9px",
+                  borderRadius: "4px",
+                  marginBottom: "12px",
+                  width: "fit-content",
+                  background: "#e2f4ee",
+                  color: "#0a5a47",
+                }}
+              >
+                Available Now
+              </span>
+              <h2
+                style={{
+                  fontFamily: "var(--font-ui)",
+                  fontSize: "0.9375rem",
+                  fontWeight: 600,
+                  color: "#1a2a4a",
+                  marginBottom: "8px",
+                  lineHeight: 1.3,
+                }}
+              >
+                EEO Investigator Certification
+              </h2>
+              <p
+                style={{
+                  fontFamily: "var(--font-ui)",
+                  fontSize: "0.8125rem",
+                  color: "var(--text-secondary)",
+                  lineHeight: 1.6,
+                  flex: 1,
+                  marginBottom: "20px",
+                }}
+              >
+                Federal equal employment opportunity law and complaint
+                investigation procedures. Covers current EEOC standards with a
+                verifiable credential.
+              </p>
+              <Link
+                to={EEO_EXAM_PATH}
+                className="btn-primary"
+                style={{
+                  display: "inline-block",
+                  fontSize: "0.75rem",
+                  width: "fit-content",
+                }}
+              >
+                View Certification
+              </Link>
+            </div>
+
+            {/* Coming soon card — ADA */}
+            <div
+              style={{
+                background: "var(--bg-warm, #f9fafb)",
+                border: "1px solid var(--border)",
+                borderRadius: "10px",
+                padding: "28px 24px",
+                display: "flex",
+                flexDirection: "column",
+                opacity: 0.6,
+              }}
+            >
+              <span
+                style={{
+                  display: "inline-block",
+                  fontFamily: "var(--font-ui)",
+                  fontSize: "0.625rem",
+                  fontWeight: 600,
+                  letterSpacing: "0.07em",
+                  textTransform: "uppercase",
+                  padding: "3px 9px",
+                  borderRadius: "4px",
+                  marginBottom: "12px",
+                  width: "fit-content",
+                  background: "#f0f0f0",
+                  color: "#888888",
+                }}
+              >
+                Coming Soon
+              </span>
+              <h2
+                style={{
+                  fontFamily: "var(--font-ui)",
+                  fontSize: "0.9375rem",
+                  fontWeight: 600,
+                  color: "#1a2a4a",
+                  marginBottom: "8px",
+                  lineHeight: 1.3,
+                }}
+              >
+                ADA &amp; Reasonable Accommodation
+              </h2>
+              <p
+                style={{
+                  fontFamily: "var(--font-ui)",
+                  fontSize: "0.8125rem",
+                  color: "var(--text-secondary)",
+                  lineHeight: 1.6,
+                  flex: 1,
+                  marginBottom: "20px",
+                }}
+              >
+                Compliance requirements under the Americans with Disabilities
+                Act, including interactive process and documentation standards.
+              </p>
+              <span
+                style={{
+                  display: "inline-block",
+                  fontFamily: "var(--font-ui)",
+                  fontSize: "0.75rem",
+                  padding: "8px 18px",
+                  borderRadius: "6px",
+                  width: "fit-content",
+                  background: "#eeeeee",
+                  color: "#aaaaaa",
+                  cursor: "default",
+                }}
+              >
+                Coming Soon
+              </span>
+            </div>
+
+            {/* Coming soon card — Harassment */}
+            <div
+              style={{
+                background: "var(--bg-warm, #f9fafb)",
+                border: "1px solid var(--border)",
+                borderRadius: "10px",
+                padding: "28px 24px",
+                display: "flex",
+                flexDirection: "column",
+                opacity: 0.6,
+              }}
+            >
+              <span
+                style={{
+                  display: "inline-block",
+                  fontFamily: "var(--font-ui)",
+                  fontSize: "0.625rem",
+                  fontWeight: 600,
+                  letterSpacing: "0.07em",
+                  textTransform: "uppercase",
+                  padding: "3px 9px",
+                  borderRadius: "4px",
+                  marginBottom: "12px",
+                  width: "fit-content",
+                  background: "#f0f0f0",
+                  color: "#888888",
+                }}
+              >
+                Coming Soon
+              </span>
+              <h2
+                style={{
+                  fontFamily: "var(--font-ui)",
+                  fontSize: "0.9375rem",
+                  fontWeight: 600,
+                  color: "#1a2a4a",
+                  marginBottom: "8px",
+                  lineHeight: 1.3,
+                }}
+              >
+                Workplace Harassment Investigation
+              </h2>
+              <p
+                style={{
+                  fontFamily: "var(--font-ui)",
+                  fontSize: "0.8125rem",
+                  color: "var(--text-secondary)",
+                  lineHeight: 1.6,
+                  flex: 1,
+                  marginBottom: "20px",
+                }}
+              >
+                Structured investigation frameworks for harassment and hostile
+                work environment claims under Title VII and related statutes.
+              </p>
+              <span
+                style={{
+                  display: "inline-block",
+                  fontFamily: "var(--font-ui)",
+                  fontSize: "0.75rem",
+                  padding: "8px 18px",
+                  borderRadius: "6px",
+                  width: "fit-content",
+                  background: "#eeeeee",
+                  color: "#aaaaaa",
+                  cursor: "default",
+                }}
+              >
+                Coming Soon
+              </span>
+            </div>
+          </div>
+
+          {/* ── Verify CTA ── */}
+          <div style={{ textAlign: "center", margin: "32px 0 16px" }}>
+            <Link
+              to="/verify"
+              style={{
+                fontFamily: "var(--font-ui)",
+                fontSize: "0.8125rem",
+                fontWeight: 500,
+                color: "#1a5fa8",
+                textDecoration: "none",
+                border: "1px solid #1a5fa8",
+                borderRadius: "6px",
+                padding: "9px 22px",
+                display: "inline-block",
+              }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLAnchorElement).style.background = "#f0f6ff";
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLAnchorElement).style.background = "transparent";
+              }}
+            >
+              Verify a Certificate
+            </Link>
+          </div>
+
+        </main>
+      </div>
+
+      {/* ── Admin footer ── */}
+      <footer
+        style={{
+          position: "fixed",
+          bottom: "var(--sp-4)",
+          left: 0,
+          width: "100%",
+          textAlign: "center",
+          pointerEvents: "none",
+        }}
+      >
+        <Link
+          to="/admin/sign-in"
+          style={{
+            fontFamily: "var(--font-ui)",
+            fontSize: "0.75rem",
+            color: "var(--text-muted)",
+            textDecoration: "none",
+            pointerEvents: "auto",
+          }}
+          onMouseEnter={(e) =>
+            (e.currentTarget.style.textDecoration = "underline")
+          }
+          onMouseLeave={(e) => (e.currentTarget.style.textDecoration = "none")}
+        >
+          Admin
+        </Link>
+      </footer>
+    </>
+  );
+}
+
+// ─── EEO Investigator Detail Page ─────────────────────────────────────────────
+
+function EeoDetailPage() {
+  // Existing owners are routed to dashboard based on owned-exam access, not legacy paid status.
+  const hasOwnedExams = useHasOwnedExams();
+  const { user } = useUser();
+  const [purchasing, setPurchasing] = useState(false);
+
+  async function handlePurchase() {
+    setPurchasing(true);
+    try {
+      const base = import.meta.env.VITE_API_URL ?? "";
+      const res = await fetch(`${base}/create-checkout-session`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clerkUserId: user?.id }),
+      });
+      const data = await res.json();
+      if (data.url) window.location.href = data.url;
+      else setPurchasing(false);
+    } catch {
+      setPurchasing(false);
+    }
+  }
 
   return (
     <>
       <div className="home-shell">
+        <Link
+          to="/"
+          className="page-back-link"
+          style={{
+            display: "inline-block",
+            marginBottom: "12px",
+            color: "var(--text-secondary)",
+            fontWeight: 600,
+            textDecoration: "underline",
+          }}
+        >
+          ← Back to Home
+        </Link>
         <header className="home-brand">
           <h1>Workplace Compliance Institute</h1>
           <hr className="home-brand-rule" />
@@ -378,22 +984,165 @@ function CatalogPage() {
         </header>
 
         <main>
-          <SignedIn>
-            {hasOwnedExams && (
-              <p style={{ fontFamily: 'var(--font-ui)', fontSize: '0.875rem', marginBottom: 'var(--sp-4)' }}>
-                <Link to="/dashboard" style={{ color: 'var(--text-secondary)', textDecoration: 'underline' }}>Go to your Dashboard</Link>
-              </p>
-            )}
-          </SignedIn>
-          <p className="home-cta-desc" style={{ marginBottom: 'var(--sp-6)' }}>Choose a certification path to get started.</p>
-          <div className="info-panel info-panel--warm info-panel--featured" style={{ marginBottom: 'var(--sp-6)' }}>
-            <p className="info-panel__title">{COURSE.title}</p>
-            <p className="home-cta-desc">
-              Earn a verifiable certification in federal equal employment opportunity law and complaint investigation. Each certificate includes a unique ID employers can verify instantly online.
+          <h2 className="home-cta-title">{COURSE.title}</h2>
+          <p className="home-cta-desc">
+            Complete a self-paced training program and earn a verifiable
+            certification in federal equal employment opportunity law and
+            complaint investigation.
+          </p>
+
+          {/* ── Section 1: Get Certified ── */}
+          <div style={{ marginBottom: "var(--sp-8)" }}>
+            <h3
+              style={{
+                fontFamily: "var(--font-ui)",
+                fontSize: "1rem",
+                fontWeight: 600,
+                marginBottom: "var(--sp-1)",
+                color: "var(--text-primary)",
+              }}
+            >
+              Get Certified
+            </h3>
+            <p
+              style={{
+                fontFamily: "var(--font-ui)",
+                fontSize: "0.875rem",
+                color: "var(--text-secondary)",
+                marginBottom: "var(--sp-1)",
+              }}
+            >
+              Complete the full training and final exam to earn your
+              certification, including a unique certificate ID employers can
+              verify online.
             </p>
-            <p style={{ fontFamily: 'var(--font-ui)', fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: 'var(--sp-2)' }}>Available for new certification or CEU renewal.</p>
-            <Link to={EEO_EXAM_PATH} className="btn-primary" style={{ display: 'inline-block', marginTop: 'var(--sp-4)' }}>View Certification</Link>
+            <p
+              style={{
+                fontFamily: "var(--font-ui)",
+                fontSize: "0.8rem",
+                color: "var(--text-muted)",
+                marginBottom: "var(--sp-1)",
+              }}
+            >
+              Course access is valid for 60 days from purchase. Certification is
+              valid for 1 year after passing the final exam.
+            </p>
+            <p
+              style={{
+                fontFamily: "var(--font-ui)",
+                fontSize: "0.8rem",
+                color: "var(--text-muted)",
+                marginBottom: "var(--sp-3)",
+              }}
+            >
+              Includes instant certificate verification for employers.
+            </p>
+            <SignedOut>
+              <div className="home-btn-row">
+                <Link to="/sign-up" className="btn-primary">
+                  Start Certification
+                </Link>
+                <Link to="/sign-in" className="btn-secondary">
+                  Log In
+                </Link>
+              </div>
+            </SignedOut>
+
+            <SignedIn>
+              {hasOwnedExams ? (
+                <div>
+                  <p
+                    style={{
+                      fontFamily: "var(--font-ui)",
+                      fontSize: "0.875rem",
+                      color: "var(--text-secondary)",
+                      marginBottom: "var(--sp-3)",
+                    }}
+                  >
+                    Manage your certification progress, renewal, and access from
+                    your dashboard.
+                  </p>
+                  <Link to="/dashboard" className="btn-primary">
+                    Go to Dashboard
+                  </Link>
+                </div>
+              ) : (
+                <div>
+                  <button
+                    onClick={handlePurchase}
+                    disabled={purchasing}
+                    className="btn-teal"
+                    style={{ opacity: purchasing ? 0.7 : 1 }}
+                  >
+                    {purchasing ? "Redirecting…" : "Purchase Certification"}
+                  </button>
+                  <p style={{ marginTop: "var(--sp-3)" }}>
+                    <SignOutButton>
+                      <button
+                        style={{
+                          background: "none",
+                          border: "none",
+                          padding: 0,
+                          cursor: "pointer",
+                          fontFamily: "var(--font-ui)",
+                          fontSize: "0.8rem",
+                          color: "var(--text-muted)",
+                          textDecoration: "underline",
+                        }}
+                      >
+                        Log out
+                      </button>
+                    </SignOutButton>
+                  </p>
+                </div>
+              )}
+            </SignedIn>
           </div>
+
+          {/* ── Section 2: Renew Certification (CEU) — hidden for owners who use dashboard ── */}
+          {!hasOwnedExams && (
+            <div style={{ marginBottom: "var(--sp-6)" }}>
+              <h3
+                style={{
+                  fontFamily: "var(--font-ui)",
+                  fontSize: "1rem",
+                  fontWeight: 600,
+                  marginBottom: "var(--sp-1)",
+                  color: "var(--text-primary)",
+                }}
+              >
+                Renew Certification (CEU)
+              </h3>
+              <p
+                style={{
+                  fontFamily: "var(--font-ui)",
+                  fontSize: "0.875rem",
+                  color: "var(--text-secondary)",
+                  marginBottom: "var(--sp-1)",
+                }}
+              >
+                Complete the renewal course and exam to extend your
+                certification.
+              </p>
+              <p
+                style={{
+                  fontFamily: "var(--font-ui)",
+                  fontSize: "0.875rem",
+                  color: "var(--text-secondary)",
+                  marginBottom: "var(--sp-3)",
+                }}
+              >
+                Already certified elsewhere? You can still renew here.
+              </p>
+              <Link
+                to="/ceu"
+                className="btn-secondary"
+                style={{ display: "inline-block" }}
+              >
+                Go to CEU Renewal
+              </Link>
+            </div>
+          )}
 
           <p className="home-verify-link">
             <Link to="/verify">Verify a Certificate</Link>
@@ -401,121 +1150,35 @@ function CatalogPage() {
         </main>
       </div>
 
-      <footer style={{ position: 'fixed', bottom: 'var(--sp-4)', left: 0, width: '100%', textAlign: 'center', pointerEvents: 'none' }}>
-        <Link to="/admin/sign-in" style={{ fontFamily: 'var(--font-ui)', fontSize: '0.75rem', color: 'var(--text-muted)', textDecoration: 'none', pointerEvents: 'auto' }}
-          onMouseEnter={e => (e.currentTarget.style.textDecoration = 'underline')}
-          onMouseLeave={e => (e.currentTarget.style.textDecoration = 'none')}
-        >Admin</Link>
+      <footer
+        style={{
+          position: "fixed",
+          bottom: "var(--sp-4)",
+          left: 0,
+          width: "100%",
+          textAlign: "center",
+          pointerEvents: "none",
+        }}
+      >
+        <Link
+          to="/admin/sign-in"
+          style={{
+            fontFamily: "var(--font-ui)",
+            fontSize: "0.75rem",
+            color: "var(--text-muted)",
+            textDecoration: "none",
+            pointerEvents: "auto",
+          }}
+          onMouseEnter={(e) =>
+            (e.currentTarget.style.textDecoration = "underline")
+          }
+          onMouseLeave={(e) => (e.currentTarget.style.textDecoration = "none")}
+        >
+          Admin
+        </Link>
       </footer>
     </>
-  )
-}
-
-// ─── EEO Investigator Detail Page ─────────────────────────────────────────────
-
-function EeoDetailPage() {
-  // Existing owners are routed to dashboard based on owned-exam access, not legacy paid status.
-  const hasOwnedExams = useHasOwnedExams()
-  const { user } = useUser()
-  const [purchasing, setPurchasing] = useState(false)
-
-  async function handlePurchase() {
-    setPurchasing(true)
-    try {
-      const base = import.meta.env.VITE_API_URL ?? ''
-      const res = await fetch(`${base}/create-checkout-session`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ clerkUserId: user?.id }),
-      })
-      const data = await res.json()
-      if (data.url) window.location.href = data.url
-      else setPurchasing(false)
-    } catch {
-      setPurchasing(false)
-    }
-  }
-
-  return (
-    <>
-    <div className="home-shell">
-      <Link to="/" className="page-back-link" style={{ display: 'inline-block', marginBottom: '12px', color: 'var(--text-secondary)', fontWeight: 600, textDecoration: 'underline' }}>← Back to Home</Link>
-      <header className="home-brand">
-        <h1>Workplace Compliance Institute</h1>
-        <hr className="home-brand-rule" />
-        <p>Professional Certification &amp; Training</p>
-      </header>
-
-      <main>
-        <h2 className="home-cta-title">{COURSE.title}</h2>
-        <p className="home-cta-desc">
-          Complete a self-paced training program and earn a verifiable certification in federal equal employment opportunity law and complaint investigation.
-        </p>
-
-        {/* ── Section 1: Get Certified ── */}
-        <div style={{ marginBottom: 'var(--sp-8)' }}>
-          <h3 style={{ fontFamily: 'var(--font-ui)', fontSize: '1rem', fontWeight: 600, marginBottom: 'var(--sp-1)', color: 'var(--text-primary)' }}>Get Certified</h3>
-          <p style={{ fontFamily: 'var(--font-ui)', fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: 'var(--sp-1)' }}>Complete the full training and final exam to earn your certification, including a unique certificate ID employers can verify online.</p>
-          <p style={{ fontFamily: 'var(--font-ui)', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 'var(--sp-1)' }}>Course access is valid for 60 days from purchase. Certification is valid for 1 year after passing the final exam.</p>
-          <p style={{ fontFamily: 'var(--font-ui)', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 'var(--sp-3)' }}>Includes instant certificate verification for employers.</p>
-          <SignedOut>
-            <div className="home-btn-row">
-              <Link to="/sign-up" className="btn-primary">Start Certification</Link>
-              <Link to="/sign-in" className="btn-secondary">Log In</Link>
-            </div>
-          </SignedOut>
-
-          <SignedIn>
-            {hasOwnedExams ? (
-              <div>
-                <p style={{ fontFamily: 'var(--font-ui)', fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: 'var(--sp-3)' }}>Manage your certification progress, renewal, and access from your dashboard.</p>
-                <Link to="/dashboard" className="btn-primary">Go to Dashboard</Link>
-              </div>
-            ) : (
-              <div>
-                <button
-                  onClick={handlePurchase}
-                  disabled={purchasing}
-                  className="btn-teal"
-                  style={{ opacity: purchasing ? 0.7 : 1 }}
-                >
-                  {purchasing ? 'Redirecting…' : 'Purchase Certification'}
-                </button>
-                <p style={{ marginTop: 'var(--sp-3)' }}>
-                  <SignOutButton>
-                    <button style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'var(--font-ui)', fontSize: '0.8rem', color: 'var(--text-muted)', textDecoration: 'underline' }}>Log out</button>
-                  </SignOutButton>
-                </p>
-              </div>
-            )}
-          </SignedIn>
-        </div>
-
-        {/* ── Section 2: Renew Certification (CEU) — hidden for owners who use dashboard ── */}
-        {!hasOwnedExams && (
-          <div style={{ marginBottom: 'var(--sp-6)' }}>
-            <h3 style={{ fontFamily: 'var(--font-ui)', fontSize: '1rem', fontWeight: 600, marginBottom: 'var(--sp-1)', color: 'var(--text-primary)' }}>Renew Certification (CEU)</h3>
-            <p style={{ fontFamily: 'var(--font-ui)', fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: 'var(--sp-1)' }}>Complete the renewal course and exam to extend your certification.</p>
-            <p style={{ fontFamily: 'var(--font-ui)', fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: 'var(--sp-3)' }}>Already certified elsewhere? You can still renew here.</p>
-            <Link to="/ceu" className="btn-secondary" style={{ display: 'inline-block' }}>Go to CEU Renewal</Link>
-          </div>
-        )}
-
-        <p className="home-verify-link">
-          <Link to="/verify">Verify a Certificate</Link>
-        </p>
-      </main>
-
-    </div>
-
-      <footer style={{ position: 'fixed', bottom: 'var(--sp-4)', left: 0, width: '100%', textAlign: 'center', pointerEvents: 'none' }}>
-        <Link to="/admin/sign-in" style={{ fontFamily: 'var(--font-ui)', fontSize: '0.75rem', color: 'var(--text-muted)', textDecoration: 'none', pointerEvents: 'auto' }}
-          onMouseEnter={e => (e.currentTarget.style.textDecoration = 'underline')}
-          onMouseLeave={e => (e.currentTarget.style.textDecoration = 'none')}
-        >Admin</Link>
-      </footer>
-    </>
-  )
+  );
 }
 
 // ─── Dashboard ────────────────────────────────────────────────────────────────
@@ -523,80 +1186,106 @@ function EeoDetailPage() {
 // Dashboard card rendering is now data-driven from owned exams via /my-exams.
 // Route/actions are still EEO-first for this phase — non-EEO exams render info only.
 type ExamEntry = {
-  examId: string
-  examTitle: string
-  examSlug: string
-  purchasedAt: string
-  ceuAccessUntil: string | null
-  certification: { issuedAt: string; expiresAt: string; renewedAt: string | null } | null
-}
+  examId: string;
+  examTitle: string;
+  examSlug: string;
+  purchasedAt: string;
+  ceuAccessUntil: string | null;
+  certification: {
+    issuedAt: string;
+    expiresAt: string;
+    renewedAt: string | null;
+  } | null;
+};
 
 function ceuStatusText(ceuAccessUntil: string | null): string {
-  if (!ceuAccessUntil) return ''
-  const until = new Date(ceuAccessUntil)
-  const now = new Date()
-  if (until <= now) return 'CEU access expired — renew to continue'
-  const days = Math.ceil((until.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
-  return `CEU access: ${days} day${days === 1 ? '' : 's'} remaining`
+  if (!ceuAccessUntil) return "";
+  const until = new Date(ceuAccessUntil);
+  const now = new Date();
+  if (until <= now) return "CEU access expired — renew to continue";
+  const days = Math.ceil(
+    (until.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
+  );
+  return `CEU access: ${days} day${days === 1 ? "" : "s"} remaining`;
 }
 
-function certStatusText(certification: ExamEntry['certification']): string {
-  if (!certification?.expiresAt) return ''
-  const expires = new Date(certification.expiresAt)
-  const renewed = certification.renewedAt ? ' (renewed)' : ''
-  return `Certification active until ${expires.toLocaleDateString()}${renewed}`
+function certStatusText(certification: ExamEntry["certification"]): string {
+  if (!certification?.expiresAt) return "";
+  const expires = new Date(certification.expiresAt);
+  const renewed = certification.renewedAt ? " (renewed)" : "";
+  return `Certification active until ${expires.toLocaleDateString()}${renewed}`;
 }
 
 function courseAccessText(purchasedAt: string): string {
-  const expiry = new Date(purchasedAt)
-  expiry.setDate(expiry.getDate() + 60)
-  const now = new Date()
-  if (expiry <= now) return 'Course access expired'
-  const days = Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
-  return `Course access: ${days} day${days === 1 ? '' : 's'} remaining`
+  const expiry = new Date(purchasedAt);
+  expiry.setDate(expiry.getDate() + 60);
+  const now = new Date();
+  if (expiry <= now) return "Course access expired";
+  const days = Math.ceil(
+    (expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
+  );
+  return `Course access: ${days} day${days === 1 ? "" : "s"} remaining`;
 }
 
 function DashboardPage() {
-  const { user } = useUser()
-  const { getToken } = useAuth()
-  const { completed, quizResults, courseAccessActive } = useCompletion()
-  const totalLessons = ACTIVE_COURSE.sections.reduce((sum, s) => sum + s.lessons.length, 0)
-  const quizzesPassed = ACTIVE_COURSE.sections.filter((s) => quizResults[s.id] === 'passed').length
+  const { user } = useUser();
+  const { getToken } = useAuth();
+  const { completed, quizResults, courseAccessActive } = useCompletion();
+  const totalLessons = ACTIVE_COURSE.sections.reduce(
+    (sum, s) => sum + s.lessons.length,
+    0,
+  );
+  const quizzesPassed = ACTIVE_COURSE.sections.filter(
+    (s) => quizResults[s.id] === "passed",
+  ).length;
 
-  const [myExams, setMyExams] = useState<ExamEntry[]>([])
-  const [extendingAccess, setExtendingAccess] = useState(false)
+  const [myExams, setMyExams] = useState<ExamEntry[]>([]);
+  const [extendingAccess, setExtendingAccess] = useState(false);
 
   async function handleExtendAccess() {
-    setExtendingAccess(true)
+    setExtendingAccess(true);
     try {
-      const base = import.meta.env.VITE_API_URL ?? ''
-      const token = await getToken()
+      const base = import.meta.env.VITE_API_URL ?? "";
+      const token = await getToken();
       const res = await fetch(`${base}/create-extend-access-session`, {
-        method: 'POST',
+        method: "POST",
         headers: { Authorization: `Bearer ${token}` },
-      })
-      const data = await res.json()
-      if (data.url) window.location.href = data.url
-      else setExtendingAccess(false)
+      });
+      const data = await res.json();
+      if (data.url) window.location.href = data.url;
+      else setExtendingAccess(false);
     } catch {
-      setExtendingAccess(false)
+      setExtendingAccess(false);
     }
   }
 
   useEffect(() => {
-    if (!user?.id) return
-    const base = import.meta.env.VITE_API_URL ?? ''
+    if (!user?.id) return;
+    const base = import.meta.env.VITE_API_URL ?? "";
     getToken().then((token) => {
-      fetch(`${base}/my-exams`, { headers: { Authorization: `Bearer ${token}` } })
+      fetch(`${base}/my-exams`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
         .then((r) => r.json())
         .then((exams: ExamEntry[]) => setMyExams(exams))
-        .catch(() => {})
-    })
-  }, [user?.id, getToken])
+        .catch(() => {});
+    });
+  }, [user?.id, getToken]);
 
   return (
     <div className="page-shell">
-      <Link to="/" className="page-back-link" style={{ color: 'var(--text-secondary)', fontWeight: 600, textDecoration: 'underline', marginBottom: '12px' }}>← Back to Home</Link>
+      <Link
+        to="/"
+        className="page-back-link"
+        style={{
+          color: "var(--text-secondary)",
+          fontWeight: 600,
+          textDecoration: "underline",
+          marginBottom: "12px",
+        }}
+      >
+        ← Back to Home
+      </Link>
       <div className="dash-header">
         <h1 className="dash-title">Dashboard</h1>
         <p className="dash-meta">{user?.primaryEmailAddress?.emailAddress}</p>
@@ -605,37 +1294,51 @@ function DashboardPage() {
       <hr className="dash-divider" />
 
       {myExams.map((exam) => {
-        const isEeo = exam.examSlug === COURSE.id
-        const isCeuOnly = exam.ceuAccessUntil !== null && exam.certification === null
-        const ceuText = ceuStatusText(exam.ceuAccessUntil)
-        const certText = certStatusText(exam.certification)
-        const accessText = (!isCeuOnly && isEeo) ? courseAccessText(exam.purchasedAt) : ''
+        const isEeo = exam.examSlug === COURSE.id;
+        const isCeuOnly =
+          exam.ceuAccessUntil !== null && exam.certification === null;
+        const ceuText = ceuStatusText(exam.ceuAccessUntil);
+        const certText = certStatusText(exam.certification);
+        const accessText =
+          !isCeuOnly && isEeo ? courseAccessText(exam.purchasedAt) : "";
 
         return (
           <div key={exam.examId}>
             <div
               className="info-panel info-panel--warm info-panel--featured"
-              style={{ marginBottom: 'var(--sp-6)' }}
+              style={{ marginBottom: "var(--sp-6)" }}
             >
               <p className="info-panel__title">{exam.examTitle}</p>
               {isEeo && !isCeuOnly && (
                 <p className="dash-course-desc">
-                  A structured program covering federal equal employment opportunity law,
-                  complaint investigation procedures, and agency compliance standards.
+                  A structured program covering federal equal employment
+                  opportunity law, complaint investigation procedures, and
+                  agency compliance standards.
                 </p>
               )}
               {certText && <p className="dash-course-progress">{certText}</p>}
               {isCeuOnly && (
-                <p className="dash-course-progress" style={{ color: 'var(--text-muted)' }}>
-                  CEU renewal access only — full course lessons are not included.
+                <p
+                  className="dash-course-progress"
+                  style={{ color: "var(--text-muted)" }}
+                >
+                  CEU renewal access only — full course lessons are not
+                  included.
                 </p>
               )}
-              {accessText && !exam.certification && courseAccessActive && <p className="dash-course-progress">{accessText}</p>}
-              {!isCeuOnly && isEeo && !exam.certification && !courseAccessActive && (
-                <p className="dash-course-progress">
-                  Your 60-day course access has expired. Extend access for another 60 days at 50% off to continue and complete your certification.
-                </p>
+              {accessText && !exam.certification && courseAccessActive && (
+                <p className="dash-course-progress">{accessText}</p>
               )}
+              {!isCeuOnly &&
+                isEeo &&
+                !exam.certification &&
+                !courseAccessActive && (
+                  <p className="dash-course-progress">
+                    Your 60-day course access has expired. Extend access for
+                    another 60 days at 50% off to continue and complete your
+                    certification.
+                  </p>
+                )}
               {!isCeuOnly && isEeo && !exam.certification && (
                 <p className="dash-course-progress">
                   {completed.size} of {totalLessons} lessons completed
@@ -646,14 +1349,21 @@ function DashboardPage() {
               {ceuText && <p className="dash-course-progress">{ceuText}</p>}
             </div>
             {isEeo && (
-              <div className="action-row" style={{ marginBottom: 'var(--sp-6)' }}>
+              <div
+                className="action-row"
+                style={{ marginBottom: "var(--sp-6)" }}
+              >
                 {/* CEU-only: single primary action — Renew Certification */}
                 {isCeuOnly && (
-                  <Link to="/ceu" className="btn-primary">Renew Certification</Link>
+                  <Link to="/ceu" className="btn-primary">
+                    Renew Certification
+                  </Link>
                 )}
                 {/* Full-course, not yet certified, access active: primary action is the course */}
                 {!isCeuOnly && !exam.certification && courseAccessActive && (
-                  <Link to="/course" className="btn-primary">View Course</Link>
+                  <Link to="/course" className="btn-primary">
+                    View Course
+                  </Link>
                 )}
                 {/* Full-course, not yet certified, access expired: offer extension purchase */}
                 {!isCeuOnly && !exam.certification && !courseAccessActive && (
@@ -663,282 +1373,328 @@ function DashboardPage() {
                     disabled={extendingAccess}
                     style={{ opacity: extendingAccess ? 0.7 : 1 }}
                   >
-                    {extendingAccess ? 'Redirecting…' : 'Extend Course Access'}
+                    {extendingAccess ? "Redirecting…" : "Extend Course Access"}
                   </button>
                 )}
                 {/* Certified user: show View Course only if still within 60-day window */}
                 {!isCeuOnly && exam.certification && courseAccessActive && (
-                  <Link to="/course" className="link-btn">View Course</Link>
+                  <Link to="/course" className="link-btn">
+                    View Course
+                  </Link>
                 )}
                 {/* Certified user: always show Renew Certification */}
                 {!isCeuOnly && exam.certification && (
-                  <Link to="/ceu" className="btn-primary">Renew Certification</Link>
+                  <Link to="/ceu" className="btn-primary">
+                    Renew Certification
+                  </Link>
                 )}
               </div>
             )}
           </div>
-        )
+        );
       })}
 
       <div className="action-row">
         <SignOutButton />
       </div>
     </div>
-  )
+  );
 }
 
 // ─── Course Page ──────────────────────────────────────────────────────────────
 
-const TOTAL_LESSONS = ACTIVE_COURSE.sections.reduce((sum, s) => sum + s.lessons.length, 0)
+const TOTAL_LESSONS = ACTIVE_COURSE.sections.reduce(
+  (sum, s) => sum + s.lessons.length,
+  0,
+);
 
 function CoursePage() {
-  const { completed, quizResults, finalExamResult } = useCompletion()
-  const { user } = useUser()
-  const { getToken } = useAuth()
-  const navigate = useNavigate()
-  const location = useLocation()
+  const { completed, quizResults, finalExamResult } = useCompletion();
+  const { user } = useUser();
+  const { getToken } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
   const quizSummary = (
     location.state as {
       quizSummary?: {
-        correct: number
-        total: number
-        passed: boolean
-        sectionTitle: string
-      }
+        correct: number;
+        total: number;
+        passed: boolean;
+        sectionTitle: string;
+      };
     } | null
-  )?.quizSummary
+  )?.quizSummary;
 
-  const allLessonsDone = ALL_LESSONS.every((l) => completed.has(l.id))
-  const allQuizzesPassed = ACTIVE_COURSE.sections.every((s) => quizResults[s.id] === 'passed')
-  const eligible = allLessonsDone && allQuizzesPassed
+  const allLessonsDone = ALL_LESSONS.every((l) => completed.has(l.id));
+  const allQuizzesPassed = ACTIVE_COURSE.sections.every(
+    (s) => quizResults[s.id] === "passed",
+  );
+  const eligible = allLessonsDone && allQuizzesPassed;
 
-  const [showNameModal, setShowNameModal] = useState(false)
-  const [nameInput, setNameInput] = useState('')
-  const [nameSaving, setNameSaving] = useState(false)
+  const [showNameModal, setShowNameModal] = useState(false);
+  const [nameInput, setNameInput] = useState("");
+  const [nameSaving, setNameSaving] = useState(false);
 
   function handleFinalExamClick() {
-    const uid = user?.id
-    const stored = uid ? localStorage.getItem(`wci_cert_name_${uid}`) : null
+    const uid = user?.id;
+    const stored = uid ? localStorage.getItem(`wci_cert_name_${uid}`) : null;
     if (stored) {
-      navigate('/final-exam')
+      navigate("/final-exam");
     } else {
-      setShowNameModal(true)
+      setShowNameModal(true);
     }
   }
 
   async function handleNameSave() {
-    const trimmed = nameInput.trim()
-    if (!trimmed) return
-    setNameSaving(true)
-    const uid = user?.id
+    const trimmed = nameInput.trim();
+    if (!trimmed) return;
+    setNameSaving(true);
+    const uid = user?.id;
     if (uid) {
-      localStorage.setItem(`wci_cert_name_${uid}`, trimmed)
+      localStorage.setItem(`wci_cert_name_${uid}`, trimmed);
     }
     try {
-      const token = await getToken()
-      const base = import.meta.env.VITE_API_URL ?? ''
+      const token = await getToken();
+      const base = import.meta.env.VITE_API_URL ?? "";
       await fetch(`${base}/set-full-name`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify({ fullName: trimmed }),
-      })
+      });
     } catch {
       // localStorage copy is the fallback; network failure is non-blocking
     }
-    setNameSaving(false)
-    setShowNameModal(false)
-    navigate('/final-exam')
+    setNameSaving(false);
+    setShowNameModal(false);
+    navigate("/final-exam");
   }
 
   return (
     <>
-    <div className="page-shell">
-      <Link to="/dashboard" className="page-back-link">← Back to Dashboard</Link>
+      <div className="page-shell">
+        <Link to="/dashboard" className="page-back-link">
+          ← Back to Dashboard
+        </Link>
 
-      <div className="page-header">
-        <h1 className="page-title">{ACTIVE_COURSE.title}</h1>
-        <p className="page-subtitle">
-          Progress: {completed.size} of {TOTAL_LESSONS} lessons completed
-        </p>
-      </div>
-
-      {/* Certification requirements */}
-      <div className="info-panel" style={{ marginBottom: 'var(--sp-5)' }}>
-        <p className="info-panel__title">Certification Requirements</p>
-        <ul className="req-list">
-          <li style={{ color: allLessonsDone ? 'var(--color-success)' : 'inherit' }}>
-            All lessons completed: {allLessonsDone ? '✓ Yes' : 'No'}
-          </li>
-          <li style={{ color: allQuizzesPassed ? 'var(--color-success)' : 'inherit' }}>
-            All section quizzes passed: {allQuizzesPassed ? '✓ Yes' : 'No'}
-          </li>
-          <li
-            style={{
-              color:
-                finalExamResult === 'passed'
-                  ? 'var(--color-success)'
-                  : finalExamResult === 'failed'
-                  ? 'var(--color-error)'
-                  : 'inherit',
-            }}
-          >
-            Final exam:{' '}
-            {finalExamResult === 'passed'
-              ? '✓ Passed'
-              : finalExamResult === 'failed'
-              ? '✗ Failed'
-              : 'Not started'}
-          </li>
-        </ul>
-      </div>
-
-      {/* Quiz result notice */}
-      {quizSummary && (
-        <div className="info-panel info-panel--notice" style={{ marginBottom: 'var(--sp-5)' }}>
-          <strong>{quizSummary.sectionTitle}:</strong> You scored {quizSummary.correct} out of{' '}
-          {quizSummary.total}.{' '}
-          <span
-            style={{
-              color: quizSummary.passed ? 'var(--color-success)' : 'var(--color-error)',
-              fontWeight: 600,
-            }}
-          >
-            {quizSummary.passed
-              ? 'Section passed.'
-              : 'You must review the section before retrying.'}
-          </span>
+        <div className="page-header">
+          <h1 className="page-title">{ACTIVE_COURSE.title}</h1>
+          <p className="page-subtitle">
+            Progress: {completed.size} of {TOTAL_LESSONS} lessons completed
+          </p>
         </div>
-      )}
 
-      {/* Certification / exam status bar */}
-      {finalExamResult === 'passed' ? (
-        <div className="status-bar status-bar--certified">
-          <span className="status-label" style={{ color: 'var(--color-gold)' }}>
-            ✓ Certified
-          </span>
-          <Link to="/certificate">View Certificate →</Link>
+        {/* Certification requirements */}
+        <div className="info-panel" style={{ marginBottom: "var(--sp-5)" }}>
+          <p className="info-panel__title">Certification Requirements</p>
+          <ul className="req-list">
+            <li
+              style={{
+                color: allLessonsDone ? "var(--color-success)" : "inherit",
+              }}
+            >
+              All lessons completed: {allLessonsDone ? "✓ Yes" : "No"}
+            </li>
+            <li
+              style={{
+                color: allQuizzesPassed ? "var(--color-success)" : "inherit",
+              }}
+            >
+              All section quizzes passed: {allQuizzesPassed ? "✓ Yes" : "No"}
+            </li>
+            <li
+              style={{
+                color:
+                  finalExamResult === "passed"
+                    ? "var(--color-success)"
+                    : finalExamResult === "failed"
+                      ? "var(--color-error)"
+                      : "inherit",
+              }}
+            >
+              Final exam:{" "}
+              {finalExamResult === "passed"
+                ? "✓ Passed"
+                : finalExamResult === "failed"
+                  ? "✗ Failed"
+                  : "Not started"}
+            </li>
+          </ul>
         </div>
-      ) : (
-        <div className="status-bar">
-          <span
-            className="status-label"
-            style={{
-              color: eligible ? 'var(--color-success)' : 'var(--text-muted)',
-            }}
+
+        {/* Quiz result notice */}
+        {quizSummary && (
+          <div
+            className="info-panel info-panel--notice"
+            style={{ marginBottom: "var(--sp-5)" }}
           >
-            {eligible ? '✓ Certification Unlocked' : '⊘ Certification Locked'}
-          </span>
-          {eligible ? (
-            <button className="btn-primary" style={{ fontSize: '0.75rem' }} onClick={handleFinalExamClick}>
-              Take Final Exam
-            </button>
-          ) : (
-            <button disabled className="btn-primary" style={{ fontSize: '0.75rem', opacity: 0.35, cursor: 'not-allowed' }}>
-              Take Final Exam
-            </button>
-          )}
-        </div>
-      )}
+            <strong>{quizSummary.sectionTitle}:</strong> You scored{" "}
+            {quizSummary.correct} out of {quizSummary.total}.{" "}
+            <span
+              style={{
+                color: quizSummary.passed
+                  ? "var(--color-success)"
+                  : "var(--color-error)",
+                fontWeight: 600,
+              }}
+            >
+              {quizSummary.passed
+                ? "Section passed."
+                : "You must review the section before retrying."}
+            </span>
+          </div>
+        )}
 
-      {/* Sections */}
-      {ACTIVE_COURSE.sections.map((section) => {
-        const quizResult = quizResults[section.id]
-        const quizLabel =
-          quizResult === 'passed'
-            ? '✓ Passed'
-            : quizResult === 'failed'
-            ? '✗ Failed'
-            : 'Not started'
-
-        return (
-          <div key={section.id} className="section-block">
-            <h2>{section.title}</h2>
-            <div className="lesson-list">
-              {section.lessons.map((lesson) => (
-                <Link key={lesson.id} to={`/lesson/${lesson.id}`}>
-                  {completed.has(lesson.id) ? '✓ ' : ''}
-                  {lesson.title}
-                </Link>
-              ))}
-            </div>
-            <div className="quiz-row">
-              <Link to={`/quiz/${section.id}`}>Start Quiz</Link>
-              <span
-                className="quiz-status"
+        {/* Certification / exam status bar */}
+        {finalExamResult === "passed" ? (
+          <div className="status-bar status-bar--certified">
+            <span
+              className="status-label"
+              style={{ color: "var(--color-gold)" }}
+            >
+              ✓ Certified
+            </span>
+            <Link to="/certificate">View Certificate →</Link>
+          </div>
+        ) : (
+          <div className="status-bar">
+            <span
+              className="status-label"
+              style={{
+                color: eligible ? "var(--color-success)" : "var(--text-muted)",
+              }}
+            >
+              {eligible ? "✓ Certification Unlocked" : "⊘ Certification Locked"}
+            </span>
+            {eligible ? (
+              <button
+                className="btn-primary"
+                style={{ fontSize: "0.75rem" }}
+                onClick={handleFinalExamClick}
+              >
+                Take Final Exam
+              </button>
+            ) : (
+              <button
+                disabled
+                className="btn-primary"
                 style={{
-                  color:
-                    quizResult === 'passed'
-                      ? 'var(--color-success)'
-                      : quizResult === 'failed'
-                      ? 'var(--color-error)'
-                      : 'var(--text-muted)',
+                  fontSize: "0.75rem",
+                  opacity: 0.35,
+                  cursor: "not-allowed",
                 }}
               >
-                Quiz: {quizLabel}
-              </span>
+                Take Final Exam
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Sections */}
+        {ACTIVE_COURSE.sections.map((section) => {
+          const quizResult = quizResults[section.id];
+          const quizLabel =
+            quizResult === "passed"
+              ? "✓ Passed"
+              : quizResult === "failed"
+                ? "✗ Failed"
+                : "Not started";
+
+          return (
+            <div key={section.id} className="section-block">
+              <h2>{section.title}</h2>
+              <div className="lesson-list">
+                {section.lessons.map((lesson) => (
+                  <Link key={lesson.id} to={`/lesson/${lesson.id}`}>
+                    {completed.has(lesson.id) ? "✓ " : ""}
+                    {lesson.title}
+                  </Link>
+                ))}
+              </div>
+              <div className="quiz-row">
+                <Link to={`/quiz/${section.id}`}>Start Quiz</Link>
+                <span
+                  className="quiz-status"
+                  style={{
+                    color:
+                      quizResult === "passed"
+                        ? "var(--color-success)"
+                        : quizResult === "failed"
+                          ? "var(--color-error)"
+                          : "var(--text-muted)",
+                  }}
+                >
+                  Quiz: {quizLabel}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {showNameModal && (
+        <div className="name-modal-overlay">
+          <div className="name-modal">
+            <p className="name-modal__title">
+              Enter your name for the certificate
+            </p>
+            <p className="name-modal__desc">
+              This name will appear on your certificate exactly as entered.
+            </p>
+            <input
+              className="name-modal__input"
+              type="text"
+              placeholder="Full name"
+              value={nameInput}
+              onChange={(e) => setNameInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleNameSave();
+              }}
+              autoFocus
+            />
+            <div className="name-modal__actions">
+              <button
+                className="btn-secondary"
+                style={{ fontSize: "0.8rem" }}
+                onClick={() => setShowNameModal(false)}
+                disabled={nameSaving}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn-primary"
+                style={{ fontSize: "0.8rem" }}
+                onClick={handleNameSave}
+                disabled={!nameInput.trim() || nameSaving}
+              >
+                {nameSaving ? "Saving…" : "Continue to Exam"}
+              </button>
             </div>
           </div>
-        )
-      })}
-    </div>
-
-    {showNameModal && (
-      <div className="name-modal-overlay">
-        <div className="name-modal">
-          <p className="name-modal__title">Enter your name for the certificate</p>
-          <p className="name-modal__desc">
-            This name will appear on your certificate exactly as entered.
-          </p>
-          <input
-            className="name-modal__input"
-            type="text"
-            placeholder="Full name"
-            value={nameInput}
-            onChange={(e) => setNameInput(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') handleNameSave() }}
-            autoFocus
-          />
-          <div className="name-modal__actions">
-            <button
-              className="btn-secondary"
-              style={{ fontSize: '0.8rem' }}
-              onClick={() => setShowNameModal(false)}
-              disabled={nameSaving}
-            >
-              Cancel
-            </button>
-            <button
-              className="btn-primary"
-              style={{ fontSize: '0.8rem' }}
-              onClick={handleNameSave}
-              disabled={!nameInput.trim() || nameSaving}
-            >
-              {nameSaving ? 'Saving…' : 'Continue to Exam'}
-            </button>
-          </div>
         </div>
-      </div>
-    )}
+      )}
     </>
-  )
+  );
 }
 
 // ─── Lesson Page ──────────────────────────────────────────────────────────────
 
 function LessonPage() {
-  const { id } = useParams<{ id: string }>()
-  const { completed, toggle } = useCompletion()
+  const { id } = useParams<{ id: string }>();
+  const { completed, toggle } = useCompletion();
 
   let foundLesson: {
-    section: (typeof ACTIVE_COURSE.sections)[0]
-    lesson: (typeof ACTIVE_COURSE.sections)[0]['lessons'][0]
-  } | null = null
+    section: (typeof ACTIVE_COURSE.sections)[0];
+    lesson: (typeof ACTIVE_COURSE.sections)[0]["lessons"][0];
+  } | null = null;
 
   for (const section of ACTIVE_COURSE.sections) {
-    const lesson = section.lessons.find((l) => l.id === id)
+    const lesson = section.lessons.find((l) => l.id === id);
     if (lesson) {
-      foundLesson = { section, lesson }
-      break
+      foundLesson = { section, lesson };
+      break;
     }
   }
 
@@ -946,20 +1702,25 @@ function LessonPage() {
     return (
       <div className="page-shell">
         <p>Lesson not found.</p>
-        <Link to="/course" className="page-back-link">← Back to Course</Link>
+        <Link to="/course" className="page-back-link">
+          ← Back to Course
+        </Link>
       </div>
-    )
+    );
   }
 
-  const { section, lesson } = foundLesson
-  const lessonIndex = ALL_LESSONS.findIndex((l) => l.id === id)
-  const prevLesson = lessonIndex > 0 ? ALL_LESSONS[lessonIndex - 1] : null
-  const nextLesson = lessonIndex < ALL_LESSONS.length - 1 ? ALL_LESSONS[lessonIndex + 1] : null
-  const isDone = completed.has(lesson.id)
+  const { section, lesson } = foundLesson;
+  const lessonIndex = ALL_LESSONS.findIndex((l) => l.id === id);
+  const prevLesson = lessonIndex > 0 ? ALL_LESSONS[lessonIndex - 1] : null;
+  const nextLesson =
+    lessonIndex < ALL_LESSONS.length - 1 ? ALL_LESSONS[lessonIndex + 1] : null;
+  const isDone = completed.has(lesson.id);
 
   return (
     <div className="page-shell">
-      <Link to="/course" className="page-back-link">← Back to Course</Link>
+      <Link to="/course" className="page-back-link">
+        ← Back to Course
+      </Link>
 
       <div className="lesson-header">
         <p className="lesson-section-label">{section.title}</p>
@@ -977,13 +1738,15 @@ function LessonPage() {
 
       <div className="lesson-complete-row">
         <button onClick={() => toggle(lesson.id)}>
-          {isDone ? 'Mark as Incomplete' : 'Mark as Complete'}
+          {isDone ? "Mark as Incomplete" : "Mark as Complete"}
         </button>
         <span
           className="lesson-complete-status"
-          style={{ color: isDone ? 'var(--color-success)' : 'var(--text-muted)' }}
+          style={{
+            color: isDone ? "var(--color-success)" : "var(--text-muted)",
+          }}
         >
-          {isDone ? '✓ Completed' : 'Not completed'}
+          {isDone ? "✓ Completed" : "Not completed"}
         </span>
       </div>
 
@@ -993,7 +1756,9 @@ function LessonPage() {
         ) : (
           <span />
         )}
-        {nextLesson && <Link to={`/lesson/${nextLesson.id}`}>Next Lesson →</Link>}
+        {nextLesson && (
+          <Link to={`/lesson/${nextLesson.id}`}>Next Lesson →</Link>
+        )}
       </div>
 
       <div className="lesson-nav-back">
@@ -1001,47 +1766,54 @@ function LessonPage() {
         <Link to="/dashboard">Back to Dashboard</Link>
       </div>
     </div>
-  )
+  );
 }
 
 // ─── Quiz Page ────────────────────────────────────────────────────────────────
 
 function QuizPage() {
-  const { sectionId } = useParams<{ sectionId: string }>()
-  const { setQuizResult } = useCompletion()
-  const navigate = useNavigate()
+  const { sectionId } = useParams<{ sectionId: string }>();
+  const { setQuizResult } = useCompletion();
+  const navigate = useNavigate();
 
-  const quiz = ACTIVE_QUIZZES.find((q) => q.sectionId === sectionId)
-  const section = ACTIVE_COURSE.sections.find((s) => s.id === sectionId)
+  const quiz = ACTIVE_QUIZZES.find((q) => q.sectionId === sectionId);
+  const section = ACTIVE_COURSE.sections.find((s) => s.id === sectionId);
 
-  const [currentIndex, setCurrentIndex] = useState(0)
+  const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<(number | null)[]>(() =>
-    quiz ? Array(quiz.questions.length).fill(null) : []
-  )
+    quiz ? Array(quiz.questions.length).fill(null) : [],
+  );
 
   if (!quiz || !section) {
     return (
       <div className="quiz-shell">
         <p>Quiz not found.</p>
-        <Link to="/course" className="page-back-link">← Back to Course</Link>
+        <Link to="/course" className="page-back-link">
+          ← Back to Course
+        </Link>
       </div>
-    )
+    );
   }
 
-  const question = quiz.questions[currentIndex]
-  const selected = answers[currentIndex]
-  const isLast = currentIndex === quiz.questions.length - 1
-  const progressPct = Math.round((currentIndex / quiz.questions.length) * 100)
+  const question = quiz.questions[currentIndex];
+  const selected = answers[currentIndex];
+  const isLast = currentIndex === quiz.questions.length - 1;
+  const progressPct = Math.round((currentIndex / quiz.questions.length) * 100);
 
   return (
     <div className="quiz-shell">
-      <Link to="/course" className="page-back-link">← Back to Course</Link>
+      <Link to="/course" className="page-back-link">
+        ← Back to Course
+      </Link>
 
       <p className="quiz-context">{section.title}</p>
       <h1 className="quiz-heading">Section Quiz</h1>
 
       <div className="quiz-progress">
-        <div className="quiz-progress__fill" style={{ width: `${progressPct}%` }} />
+        <div
+          className="quiz-progress__fill"
+          style={{ width: `${progressPct}%` }}
+        />
       </div>
 
       <p className="quiz-counter">
@@ -1054,12 +1826,12 @@ function QuizPage() {
         {question.options.map((option, i) => (
           <button
             key={i}
-            className={`quiz-option${selected === i ? ' quiz-option--selected' : ''}`}
+            className={`quiz-option${selected === i ? " quiz-option--selected" : ""}`}
             onClick={() =>
               setAnswers((prev) => {
-                const next = [...prev]
-                next[currentIndex] = i
-                return next
+                const next = [...prev];
+                next[currentIndex] = i;
+                return next;
               })
             }
           >
@@ -1075,12 +1847,12 @@ function QuizPage() {
         onClick={() => {
           if (isLast) {
             const correct = answers.filter(
-              (a, i) => a === quiz.questions[i].correctIndex
-            ).length
-            const total = quiz.questions.length
-            const passed = correct / total >= 0.8
-            setQuizResult(section.id, passed ? 'passed' : 'failed')
-            navigate('/course', {
+              (a, i) => a === quiz.questions[i].correctIndex,
+            ).length;
+            const total = quiz.questions.length;
+            const passed = correct / total >= 0.8;
+            setQuizResult(section.id, passed ? "passed" : "failed");
+            navigate("/course", {
               state: {
                 quizSummary: {
                   correct,
@@ -1089,76 +1861,88 @@ function QuizPage() {
                   sectionTitle: section.title,
                 },
               },
-            })
+            });
           } else {
-            setCurrentIndex((i) => i + 1)
+            setCurrentIndex((i) => i + 1);
           }
         }}
       >
-        {isLast ? 'Submit Quiz' : 'Next Question'}
+        {isLast ? "Submit Quiz" : "Next Question"}
       </button>
     </div>
-  )
+  );
 }
 
 // ─── Final Exam Page ──────────────────────────────────────────────────────────
 
-const DEV_BYPASS_FINAL_EXAM = false // TODO: remove before production
+const DEV_BYPASS_FINAL_EXAM = false; // TODO: remove before production
 
 function FinalExamPage() {
-  const { completed, quizResults, finalExamResult, setFinalExamResult } = useCompletion()
-  const { user } = useUser()
-  const { getToken } = useAuth()
-  const allLessonsDone = ALL_LESSONS.every((l) => completed.has(l.id))
-  const allQuizzesPassed = ACTIVE_COURSE.sections.every((s) => quizResults[s.id] === 'passed')
-  const eligible = DEV_BYPASS_FINAL_EXAM || (allLessonsDone && allQuizzesPassed)
+  const { completed, quizResults, finalExamResult, setFinalExamResult } =
+    useCompletion();
+  const { user } = useUser();
+  const { getToken } = useAuth();
+  const allLessonsDone = ALL_LESSONS.every((l) => completed.has(l.id));
+  const allQuizzesPassed = ACTIVE_COURSE.sections.every(
+    (s) => quizResults[s.id] === "passed",
+  );
+  const eligible =
+    DEV_BYPASS_FINAL_EXAM || (allLessonsDone && allQuizzesPassed);
 
-  const [currentIndex, setCurrentIndex] = useState(0)
+  const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<(number | null)[]>(
-    Array(ACTIVE_FINAL_EXAM.length).fill(null)
-  )
-  const [showResults, setShowResults] = useState(false)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [issuanceError, setIssuanceError] = useState(false)
+    Array(ACTIVE_FINAL_EXAM.length).fill(null),
+  );
+  const [showResults, setShowResults] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [issuanceError, setIssuanceError] = useState(false);
 
   if (!eligible) {
     return (
       <div className="exam-shell">
-        <Link to="/course" className="page-back-link">← Back to Course</Link>
-        <div className="info-panel info-panel--notice" style={{ marginTop: 'var(--sp-6)' }}>
-          You must complete all lessons and pass all section quizzes before taking the final exam.
+        <Link to="/course" className="page-back-link">
+          ← Back to Course
+        </Link>
+        <div
+          className="info-panel info-panel--notice"
+          style={{ marginTop: "var(--sp-6)" }}
+        >
+          You must complete all lessons and pass all section quizzes before
+          taking the final exam.
         </div>
       </div>
-    )
+    );
   }
 
-  if (finalExamResult === 'passed') {
+  if (finalExamResult === "passed") {
     return (
       <div className="exam-shell">
-        <Link to="/course" className="page-back-link">← Back to Course</Link>
+        <Link to="/course" className="page-back-link">
+          ← Back to Course
+        </Link>
         <div
           className="status-bar status-bar--certified"
-          style={{ marginTop: 'var(--sp-6)' }}
+          style={{ marginTop: "var(--sp-6)" }}
         >
-          <span className="status-label" style={{ color: 'var(--color-gold)' }}>
+          <span className="status-label" style={{ color: "var(--color-gold)" }}>
             ✓ Final Exam Passed
           </span>
           <Link to="/certificate">View Certificate →</Link>
         </div>
       </div>
-    )
+    );
   }
 
   if (showResults) {
     const correct = answers.filter(
-      (a, i) => a === ACTIVE_FINAL_EXAM[i].correctIndex
-    ).length
-    const total = ACTIVE_FINAL_EXAM.length
-    const passed = correct / total >= 0.8
+      (a, i) => a === ACTIVE_FINAL_EXAM[i].correctIndex,
+    ).length;
+    const total = ACTIVE_FINAL_EXAM.length;
+    const passed = correct / total >= 0.8;
 
     return (
       <div className="exam-shell">
-        <h1 className="page-title" style={{ marginBottom: 'var(--sp-6)' }}>
+        <h1 className="page-title" style={{ marginBottom: "var(--sp-6)" }}>
           Final Exam Results
         </h1>
         <div className="exam-results-panel">
@@ -1168,26 +1952,26 @@ function FinalExamPage() {
           </p>
           <p
             style={{
-              fontFamily: 'var(--font-ui)',
+              fontFamily: "var(--font-ui)",
               fontWeight: 700,
-              fontSize: '0.8rem',
-              letterSpacing: '0.06em',
-              textTransform: 'uppercase',
-              color: passed ? 'var(--color-success)' : 'var(--color-error)',
-              marginTop: 'var(--sp-3)',
+              fontSize: "0.8rem",
+              letterSpacing: "0.06em",
+              textTransform: "uppercase",
+              color: passed ? "var(--color-success)" : "var(--color-error)",
+              marginTop: "var(--sp-3)",
             }}
           >
-            {passed ? '✓ Final exam passed.' : '✗ Final exam failed.'}
+            {passed ? "✓ Final exam passed." : "✗ Final exam failed."}
           </p>
         </div>
-        <div style={{ display: 'flex', gap: 'var(--sp-4)' }}>
+        <div style={{ display: "flex", gap: "var(--sp-4)" }}>
           {!passed && (
             <button
               className="btn-primary"
               onClick={() => {
-                setAnswers(Array(ACTIVE_FINAL_EXAM.length).fill(null))
-                setCurrentIndex(0)
-                setShowResults(false)
+                setAnswers(Array(ACTIVE_FINAL_EXAM.length).fill(null));
+                setCurrentIndex(0);
+                setShowResults(false);
               }}
             >
               Retry Exam
@@ -1198,21 +1982,28 @@ function FinalExamPage() {
           </Link>
         </div>
       </div>
-    )
+    );
   }
 
-  const question = ACTIVE_FINAL_EXAM[currentIndex]
-  const selected = answers[currentIndex]
-  const isLast = currentIndex === ACTIVE_FINAL_EXAM.length - 1
-  const progressPct = Math.round((currentIndex / ACTIVE_FINAL_EXAM.length) * 100)
+  const question = ACTIVE_FINAL_EXAM[currentIndex];
+  const selected = answers[currentIndex];
+  const isLast = currentIndex === ACTIVE_FINAL_EXAM.length - 1;
+  const progressPct = Math.round(
+    (currentIndex / ACTIVE_FINAL_EXAM.length) * 100,
+  );
 
   return (
     <div className="exam-shell">
-      <Link to="/course" className="page-back-link">← Back to Course</Link>
+      <Link to="/course" className="page-back-link">
+        ← Back to Course
+      </Link>
       <h1 className="quiz-heading">Final Exam</h1>
 
       <div className="quiz-progress">
-        <div className="quiz-progress__fill" style={{ width: `${progressPct}%` }} />
+        <div
+          className="quiz-progress__fill"
+          style={{ width: `${progressPct}%` }}
+        />
       </div>
 
       <p className="quiz-counter">
@@ -1225,12 +2016,12 @@ function FinalExamPage() {
         {question.options.map((option, i) => (
           <button
             key={i}
-            className={`quiz-option${selected === i ? ' quiz-option--selected' : ''}`}
+            className={`quiz-option${selected === i ? " quiz-option--selected" : ""}`}
             onClick={() =>
               setAnswers((prev) => {
-                const next = [...prev]
-                next[currentIndex] = i
-                return next
+                const next = [...prev];
+                next[currentIndex] = i;
+                return next;
               })
             }
           >
@@ -1246,172 +2037,239 @@ function FinalExamPage() {
         onClick={async () => {
           if (isLast) {
             const correct = answers.filter(
-              (a, i) => a === ACTIVE_FINAL_EXAM[i].correctIndex
-            ).length
-            const passed = correct / ACTIVE_FINAL_EXAM.length >= 0.8
+              (a, i) => a === ACTIVE_FINAL_EXAM[i].correctIndex,
+            ).length;
+            const passed = correct / ACTIVE_FINAL_EXAM.length >= 0.8;
 
             if (!passed) {
-              setFinalExamResult('failed')
-              setShowResults(true)
-              return
+              setFinalExamResult("failed");
+              setShowResults(true);
+              return;
             }
 
             // Passed — issue certification server-side before marking locally.
-            setIsSubmitting(true)
-            setIssuanceError(false)
+            setIsSubmitting(true);
+            setIssuanceError(false);
             try {
-              const uid = user?.id
-              const fullName = (uid ? localStorage.getItem(`wci_cert_name_${uid}`) : null) ?? ''
-              const token = await getToken()
-              const base = import.meta.env.VITE_API_URL ?? ''
+              const uid = user?.id;
+              const fullName =
+                (uid ? localStorage.getItem(`wci_cert_name_${uid}`) : null) ??
+                "";
+              const token = await getToken();
+              const base = import.meta.env.VITE_API_URL ?? "";
               const res = await fetch(`${base}/complete-exam`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${token}`,
+                },
                 body: JSON.stringify({ fullName }),
-              })
-              if (!res.ok) throw new Error(`${res.status}`)
+              });
+              if (!res.ok) throw new Error(`${res.status}`);
               // Server confirmed — now mark locally and show results.
-              setFinalExamResult('passed')
-              setShowResults(true)
+              setFinalExamResult("passed");
+              setShowResults(true);
             } catch {
-              setIssuanceError(true)
+              setIssuanceError(true);
             } finally {
-              setIsSubmitting(false)
+              setIsSubmitting(false);
             }
           } else {
-            setCurrentIndex((i) => i + 1)
+            setCurrentIndex((i) => i + 1);
           }
         }}
       >
-        {isSubmitting ? 'Saving…' : isLast ? 'Submit Exam' : 'Next Question'}
+        {isSubmitting ? "Saving…" : isLast ? "Submit Exam" : "Next Question"}
       </button>
       {issuanceError && (
-        <p style={{ fontFamily: 'var(--font-ui)', fontSize: '0.875rem', color: 'var(--color-error)', marginTop: 'var(--sp-4)' }}>
+        <p
+          style={{
+            fontFamily: "var(--font-ui)",
+            fontSize: "0.875rem",
+            color: "var(--color-error)",
+            marginTop: "var(--sp-4)",
+          }}
+        >
           Something went wrong saving your result. Please try submitting again.
         </p>
       )}
     </div>
-  )
+  );
 }
 
 // ─── CEU Renewal Exam Page ────────────────────────────────────────────────────
 
 function CeuPage() {
-  const { user } = useUser()
-  const { getToken } = useAuth()
+  const { user } = useUser();
+  const { getToken } = useAuth();
   // CEU flow is now keyed server-side by authenticated user + exam. certId is no longer needed in the browser.
-  const [searchParams] = useSearchParams()
-  const returnType = searchParams.get('type')
-  const justPaid = returnType === 'paid'
+  const [searchParams] = useSearchParams();
+  const returnType = searchParams.get("type");
+  const justPaid = returnType === "paid";
 
-  const [accessChecked, setAccessChecked] = useState(false)
-  const [allowed, setAllowed] = useState(false)
-  const [expiresAt, setExpiresAt] = useState<string | null>(null)
+  const [accessChecked, setAccessChecked] = useState(false);
+  const [allowed, setAllowed] = useState(false);
+  const [expiresAt, setExpiresAt] = useState<string | null>(null);
 
   useEffect(() => {
     getToken().then((token) => {
-      fetch('/my-certification', { headers: { Authorization: `Bearer ${token}` } })
+      fetch("/my-certification", {
+        headers: { Authorization: `Bearer ${token}` },
+      })
         .then((r) => r.json())
-        .then((data) => { if (data?.expiresAt) setExpiresAt(new Date(data.expiresAt).toLocaleDateString()) })
-        .catch(() => {})
-    })
-  }, [getToken])
+        .then((data) => {
+          if (data?.expiresAt)
+            setExpiresAt(new Date(data.expiresAt).toLocaleDateString());
+        })
+        .catch(() => {});
+    });
+  }, [getToken]);
 
   useEffect(() => {
-    if (justPaid) { setAllowed(true); setAccessChecked(true); return }
+    if (justPaid) {
+      setAllowed(true);
+      setAccessChecked(true);
+      return;
+    }
     getToken().then((token) => {
-      fetch('/ceu-access', { headers: { Authorization: `Bearer ${token}` } })
+      fetch("/ceu-access", { headers: { Authorization: `Bearer ${token}` } })
         .then((r) => r.json())
-        .then((data) => { setAllowed(!!data.allowed); setAccessChecked(true) })
-        .catch(() => setAccessChecked(true))
-    })
-  }, [justPaid, getToken])
+        .then((data) => {
+          setAllowed(!!data.allowed);
+          setAccessChecked(true);
+        })
+        .catch(() => setAccessChecked(true));
+    });
+  }, [justPaid, getToken]);
 
-  const [currentIndex, setCurrentIndex] = useState(0)
+  const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<(number | null)[]>(
-    Array(CEU_QUESTIONS.length).fill(null)
-  )
-  const [showResults, setShowResults] = useState(false)
+    Array(CEU_QUESTIONS.length).fill(null),
+  );
+  const [showResults, setShowResults] = useState(false);
 
   if (!accessChecked) {
-    return <div className="exam-shell"><p>Loading...</p></div>
+    return (
+      <div className="exam-shell">
+        <p>Loading...</p>
+      </div>
+    );
   }
 
   if (!allowed) {
     return (
       <div className="exam-shell">
-        <Link to="/" className="page-back-link" style={{ display: 'inline-block', marginBottom: 'var(--sp-4)', color: 'var(--text-secondary)', fontWeight: 600, textDecoration: 'underline' }}>← Back to Home</Link>
-        <h1 className="page-title" style={{ marginBottom: 'var(--sp-6)' }}>Certification Renewal (CEU)</h1>
-        {expiresAt && <p style={{ fontFamily: 'var(--font-ui)', color: 'var(--color-muted)', marginBottom: 'var(--sp-4)' }}>Current Expiration: {expiresAt}</p>}
-        <div className="info-panel info-panel--notice" style={{ marginTop: 'var(--sp-6)' }}>
+        <Link
+          to="/"
+          className="page-back-link"
+          style={{
+            display: "inline-block",
+            marginBottom: "var(--sp-4)",
+            color: "var(--text-secondary)",
+            fontWeight: 600,
+            textDecoration: "underline",
+          }}
+        >
+          ← Back to Home
+        </Link>
+        <h1 className="page-title" style={{ marginBottom: "var(--sp-6)" }}>
+          Certification Renewal (CEU)
+        </h1>
+        {expiresAt && (
+          <p
+            style={{
+              fontFamily: "var(--font-ui)",
+              color: "var(--color-muted)",
+              marginBottom: "var(--sp-4)",
+            }}
+          >
+            Current Expiration: {expiresAt}
+          </p>
+        )}
+        <div
+          className="info-panel info-panel--notice"
+          style={{ marginTop: "var(--sp-6)" }}
+        >
           Payment required to access the CEU renewal exam.
         </div>
-        <div style={{ marginTop: 'var(--sp-6)' }}>
+        <div style={{ marginTop: "var(--sp-6)" }}>
           <button
             className="btn-primary"
             onClick={async () => {
-              const token = await getToken()
-              const base = import.meta.env.VITE_API_URL ?? ''
+              const token = await getToken();
+              const base = import.meta.env.VITE_API_URL ?? "";
               const res = await fetch(`${base}/create-ceu-checkout-session`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${token}`,
+                },
                 body: JSON.stringify({}),
-              })
-              const text = await res.text()
-              let data: any = {}
-              try { data = JSON.parse(text) } catch { /* non-JSON error response */ }
-              if (data.url) window.location.href = data.url
+              });
+              const text = await res.text();
+              let data: any = {};
+              try {
+                data = JSON.parse(text);
+              } catch {
+                /* non-JSON error response */
+              }
+              if (data.url) window.location.href = data.url;
             }}
           >
             Purchase CEU Renewal
           </button>
         </div>
       </div>
-    )
+    );
   }
 
   if (showResults) {
     const correct = answers.filter(
-      (a, i) => a === CEU_QUESTIONS[i].correctIndex
-    ).length
-    const total = CEU_QUESTIONS.length
-    const passed = correct / total >= 0.8
+      (a, i) => a === CEU_QUESTIONS[i].correctIndex,
+    ).length;
+    const total = CEU_QUESTIONS.length;
+    const passed = correct / total >= 0.8;
 
     return (
       <div className="exam-shell">
-        <h1 className="page-title" style={{ marginBottom: 'var(--sp-6)' }}>
+        <h1 className="page-title" style={{ marginBottom: "var(--sp-6)" }}>
           Certification Renewal (CEU) Results
         </h1>
         {passed && (
-          <div className="info-panel info-panel--success" style={{ marginBottom: 'var(--sp-6)' }}>
+          <div
+            className="info-panel info-panel--success"
+            style={{ marginBottom: "var(--sp-6)" }}
+          >
             Your certification has been successfully renewed.
           </div>
         )}
         <div className="exam-results-panel">
           <p className="results-label">Score</p>
-          <p className="results-score">{correct}/{total}</p>
+          <p className="results-score">
+            {correct}/{total}
+          </p>
           <p
             style={{
-              fontFamily: 'var(--font-ui)',
+              fontFamily: "var(--font-ui)",
               fontWeight: 700,
-              fontSize: '0.8rem',
-              letterSpacing: '0.06em',
-              textTransform: 'uppercase',
-              color: passed ? 'var(--color-success)' : 'var(--color-error)',
-              marginTop: 'var(--sp-3)',
+              fontSize: "0.8rem",
+              letterSpacing: "0.06em",
+              textTransform: "uppercase",
+              color: passed ? "var(--color-success)" : "var(--color-error)",
+              marginTop: "var(--sp-3)",
             }}
           >
-            {passed ? '✓ Renewal exam passed.' : '✗ Renewal exam failed.'}
+            {passed ? "✓ Renewal exam passed." : "✗ Renewal exam failed."}
           </p>
         </div>
-        <div style={{ display: 'flex', gap: 'var(--sp-4)' }}>
+        <div style={{ display: "flex", gap: "var(--sp-4)" }}>
           {!passed && (
             <button
               className="btn-primary"
               onClick={() => {
-                setAnswers(Array(CEU_QUESTIONS.length).fill(null))
-                setCurrentIndex(0)
-                setShowResults(false)
+                setAnswers(Array(CEU_QUESTIONS.length).fill(null));
+                setCurrentIndex(0);
+                setShowResults(false);
               }}
             >
               Retry Exam
@@ -1422,22 +2280,37 @@ function CeuPage() {
           </Link>
         </div>
       </div>
-    )
+    );
   }
 
-  const question = CEU_QUESTIONS[currentIndex]
-  const selected = answers[currentIndex]
-  const isLast = currentIndex === CEU_QUESTIONS.length - 1
-  const progressPct = Math.round((currentIndex / CEU_QUESTIONS.length) * 100)
+  const question = CEU_QUESTIONS[currentIndex];
+  const selected = answers[currentIndex];
+  const isLast = currentIndex === CEU_QUESTIONS.length - 1;
+  const progressPct = Math.round((currentIndex / CEU_QUESTIONS.length) * 100);
 
   return (
     <div className="exam-shell">
-      <Link to="/dashboard" className="page-back-link">← Back to Dashboard</Link>
+      <Link to="/dashboard" className="page-back-link">
+        ← Back to Dashboard
+      </Link>
       <h1 className="quiz-heading">Certification Renewal (CEU)</h1>
-      {expiresAt && <p style={{ fontFamily: 'var(--font-ui)', color: 'var(--color-muted)', marginBottom: 'var(--sp-4)' }}>Current Expiration: {expiresAt}</p>}
+      {expiresAt && (
+        <p
+          style={{
+            fontFamily: "var(--font-ui)",
+            color: "var(--color-muted)",
+            marginBottom: "var(--sp-4)",
+          }}
+        >
+          Current Expiration: {expiresAt}
+        </p>
+      )}
 
       <div className="quiz-progress">
-        <div className="quiz-progress__fill" style={{ width: `${progressPct}%` }} />
+        <div
+          className="quiz-progress__fill"
+          style={{ width: `${progressPct}%` }}
+        />
       </div>
 
       <p className="quiz-counter">
@@ -1450,12 +2323,12 @@ function CeuPage() {
         {question.options.map((option, i) => (
           <button
             key={i}
-            className={`quiz-option${selected === i ? ' quiz-option--selected' : ''}`}
+            className={`quiz-option${selected === i ? " quiz-option--selected" : ""}`}
             onClick={() =>
               setAnswers((prev) => {
-                const next = [...prev]
-                next[currentIndex] = i
-                return next
+                const next = [...prev];
+                next[currentIndex] = i;
+                return next;
               })
             }
           >
@@ -1471,97 +2344,115 @@ function CeuPage() {
         onClick={async () => {
           if (isLast) {
             const correct = answers.filter(
-              (a, i) => a === CEU_QUESTIONS[i].correctIndex
-            ).length
-            const passed = correct / CEU_QUESTIONS.length >= 0.8
+              (a, i) => a === CEU_QUESTIONS[i].correctIndex,
+            ).length;
+            const passed = correct / CEU_QUESTIONS.length >= 0.8;
 
             if (passed && user?.id) {
               try {
-                await fetch('/ceu-complete', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
+                await fetch("/ceu-complete", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({ clerkUserId: user.id }),
-                })
+                });
               } catch (err) {
-                console.error('Failed to record CEU renewal:', err)
+                console.error("Failed to record CEU renewal:", err);
               }
             }
 
-            setShowResults(true)
+            setShowResults(true);
           } else {
-            setCurrentIndex((i) => i + 1)
+            setCurrentIndex((i) => i + 1);
           }
         }}
       >
-        {isLast ? 'Submit Exam' : 'Next Question'}
+        {isLast ? "Submit Exam" : "Next Question"}
       </button>
     </div>
-  )
+  );
 }
 
 function ProtectedCeu() {
   return (
     <>
-      <SignedIn><CeuPage /></SignedIn>
-      <SignedOut><Navigate to="/sign-in" replace /></SignedOut>
+      <SignedIn>
+        <CeuPage />
+      </SignedIn>
+      <SignedOut>
+        <Navigate to="/sign-in" replace />
+      </SignedOut>
     </>
-  )
+  );
 }
 
 // ─── Certificate Page ─────────────────────────────────────────────────────────
 
 function CertificatePage() {
-  const { finalExamResult } = useCompletion()
-  const { user } = useUser()
-  const { getToken } = useAuth()
-  const [certName, setCertName] = useState<string | null>(null)
-  const [certificateId, setCertificateId] = useState<string | null>(null)
+  const { finalExamResult } = useCompletion();
+  const { user } = useUser();
+  const { getToken } = useAuth();
+  const [certName, setCertName] = useState<string | null>(null);
+  const [certificateId, setCertificateId] = useState<string | null>(null);
 
   useEffect(() => {
-    const uid = user?.id
+    const uid = user?.id;
     // Try server first (backfilled users have UserCertification.fullName)
     getToken().then((token) => {
-      const base = import.meta.env.VITE_API_URL ?? ''
-      fetch(`${base}/my-certification`, { headers: { Authorization: `Bearer ${token}` } })
+      const base = import.meta.env.VITE_API_URL ?? "";
+      fetch(`${base}/my-certification`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
         .then((r) => r.json())
         .then((data) => {
-          if (data?.certificateId) setCertificateId(data.certificateId)
+          if (data?.certificateId) setCertificateId(data.certificateId);
           if (data?.fullName) {
-            setCertName(data.fullName)
+            setCertName(data.fullName);
           } else {
             // Fallback: localStorage (set before exam for new users)
-            const local = uid ? localStorage.getItem(`wci_cert_name_${uid}`) : null
-            setCertName(local ?? user?.primaryEmailAddress?.emailAddress ?? null)
+            const local = uid
+              ? localStorage.getItem(`wci_cert_name_${uid}`)
+              : null;
+            setCertName(
+              local ?? user?.primaryEmailAddress?.emailAddress ?? null,
+            );
             // If we found a name in localStorage and the server record now exists, persist it
             if (local && data !== null) {
               fetch(`${base}/set-full-name`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${token}`,
+                },
                 body: JSON.stringify({ fullName: local }),
-              }).catch(() => {})
+              }).catch(() => {});
             }
           }
         })
         .catch(() => {
-          const local = uid ? localStorage.getItem(`wci_cert_name_${uid}`) : null
-          setCertName(local ?? user?.primaryEmailAddress?.emailAddress ?? null)
-        })
-    })
-  }, [user, getToken])
+          const local = uid
+            ? localStorage.getItem(`wci_cert_name_${uid}`)
+            : null;
+          setCertName(local ?? user?.primaryEmailAddress?.emailAddress ?? null);
+        });
+    });
+  }, [user, getToken]);
 
-  if (finalExamResult !== 'passed') return <Navigate to="/course" replace />
+  if (finalExamResult !== "passed") return <Navigate to="/course" replace />;
 
-  const displayName = certName ?? user?.primaryEmailAddress?.emailAddress ?? 'the participant'
-  const date = new Date().toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  })
+  const displayName =
+    certName ?? user?.primaryEmailAddress?.emailAddress ?? "the participant";
+  const date = new Date().toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
 
   return (
     <div className="certificate-shell">
       <div className="no-print certificate-actions">
-        <Link to="/course" className="btn-secondary">← Back to Course</Link>
+        <Link to="/course" className="btn-secondary">
+          ← Back to Course
+        </Link>
         <button className="btn-primary" onClick={() => window.print()}>
           Download PDF
         </button>
@@ -1578,9 +2469,9 @@ function CertificatePage() {
 
         <p
           style={{
-            fontFamily: 'var(--font-ui)',
-            fontSize: '0.875rem',
-            color: 'var(--text-muted)',
+            fontFamily: "var(--font-ui)",
+            fontSize: "0.875rem",
+            color: "var(--text-muted)",
           }}
         >
           has successfully completed the course
@@ -1593,68 +2484,123 @@ function CertificatePage() {
         <p className="certificate-date">Issued {date}</p>
 
         {certificateId && (
-          <div style={{ marginTop: 'var(--sp-6)', borderTop: '1px solid var(--border)', paddingTop: 'var(--sp-4)' }}>
-            <p style={{ fontFamily: 'var(--font-ui)', fontSize: '0.7rem', color: 'var(--text-muted)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 'var(--sp-1)' }}>
+          <div
+            style={{
+              marginTop: "var(--sp-6)",
+              borderTop: "1px solid var(--border)",
+              paddingTop: "var(--sp-4)",
+            }}
+          >
+            <p
+              style={{
+                fontFamily: "var(--font-ui)",
+                fontSize: "0.7rem",
+                color: "var(--text-muted)",
+                letterSpacing: "0.08em",
+                textTransform: "uppercase",
+                marginBottom: "var(--sp-1)",
+              }}
+            >
               Certificate ID
             </p>
-            <p style={{ fontFamily: 'var(--font-mono, monospace)', fontSize: '0.875rem', color: 'var(--text-primary)', fontWeight: 600, letterSpacing: '0.06em', marginBottom: 'var(--sp-2)' }}>
+            <p
+              style={{
+                fontFamily: "var(--font-mono, monospace)",
+                fontSize: "0.875rem",
+                color: "var(--text-primary)",
+                fontWeight: 600,
+                letterSpacing: "0.06em",
+                marginBottom: "var(--sp-2)",
+              }}
+            >
               {certificateId}
             </p>
-            <p style={{ fontFamily: 'var(--font-ui)', fontSize: '0.7rem', color: 'var(--text-muted)', letterSpacing: '0.02em' }}>
-              Verify at workplacecomplianceinstitute.com/verify?certificateId={certificateId}
+            <p
+              style={{
+                fontFamily: "var(--font-ui)",
+                fontSize: "0.7rem",
+                color: "var(--text-muted)",
+                letterSpacing: "0.02em",
+              }}
+            >
+              Verify at workplacecomplianceinstitute.com/verify?certificateId=
+              {certificateId}
             </p>
           </div>
         )}
       </div>
 
       {certificateId && (
-        <div className="no-print" style={{ marginTop: 'var(--sp-6)', padding: 'var(--sp-4) var(--sp-5)', background: 'var(--bg-warm)', border: '1px solid var(--border)', borderRadius: 'var(--r-lg)', fontFamily: 'var(--font-ui)', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-          <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Certificate ID: {certificateId}</span>
-          {' '}— Share this ID or{' '}
-          <Link to={`/verify?certificateId=${encodeURIComponent(certificateId)}`} style={{ color: 'var(--navy)', fontWeight: 600 }}>verify instantly</Link>
-          {' '}to confirm authenticity.
+        <div
+          className="no-print"
+          style={{
+            marginTop: "var(--sp-6)",
+            padding: "var(--sp-4) var(--sp-5)",
+            background: "var(--bg-warm)",
+            border: "1px solid var(--border)",
+            borderRadius: "var(--r-lg)",
+            fontFamily: "var(--font-ui)",
+            fontSize: "0.8rem",
+            color: "var(--text-secondary)",
+          }}
+        >
+          <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>
+            Certificate ID: {certificateId}
+          </span>{" "}
+          — Share this ID or{" "}
+          <Link
+            to={`/verify?certificateId=${encodeURIComponent(certificateId)}`}
+            style={{ color: "var(--navy)", fontWeight: 600 }}
+          >
+            verify instantly
+          </Link>{" "}
+          to confirm authenticity.
         </div>
       )}
     </div>
-  )
+  );
 }
 
 // ─── Verify Page ──────────────────────────────────────────────────────────────
 
 type VerifyResult = {
-  certificateId: string
-  fullName: string | null
-  examTitle: string
-  issuedAt: string
-  expiresAt: string
-  status: 'Valid' | 'Expired'
-}
+  certificateId: string;
+  fullName: string | null;
+  examTitle: string;
+  issuedAt: string;
+  expiresAt: string;
+  status: "Valid" | "Expired";
+};
 
 function VerifyPage() {
-  const [searchParams] = useSearchParams()
-  const paramId = searchParams.get('certificateId') ?? ''
-  const [certId, setCertId] = useState(paramId)
-  const [result, setResult] = useState<VerifyResult | 'not-found' | 'error' | null>(null)
-  const [loading, setLoading] = useState(false)
+  const [searchParams] = useSearchParams();
+  const paramId = searchParams.get("certificateId") ?? "";
+  const [certId, setCertId] = useState(paramId);
+  const [result, setResult] = useState<
+    VerifyResult | "not-found" | "error" | null
+  >(null);
+  const [loading, setLoading] = useState(false);
 
   async function runVerify(id: string) {
-    if (!id.trim()) return
-    setLoading(true)
-    setResult(null)
+    if (!id.trim()) return;
+    setLoading(true);
+    setResult(null);
     try {
-      const base = import.meta.env.VITE_API_URL ?? ''
-      const res = await fetch(`${base}/verify?certificateId=${encodeURIComponent(id.trim())}`)
+      const base = import.meta.env.VITE_API_URL ?? "";
+      const res = await fetch(
+        `${base}/verify?certificateId=${encodeURIComponent(id.trim())}`,
+      );
       if (res.status === 404) {
-        setResult('not-found')
+        setResult("not-found");
       } else if (res.ok) {
-        setResult(await res.json())
+        setResult(await res.json());
       } else {
-        setResult('error')
+        setResult("error");
       }
     } catch {
-      setResult('error')
+      setResult("error");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
@@ -1663,32 +2609,41 @@ function VerifyPage() {
   // When paramId is empty (param removed): clear the input and result — do not fetch.
   useEffect(() => {
     if (paramId) {
-      setCertId(paramId)
-      runVerify(paramId)
+      setCertId(paramId);
+      runVerify(paramId);
     } else {
-      setCertId('')
-      setResult(null)
+      setCertId("");
+      setResult(null);
     }
     // runVerify is defined inside the component but does not depend on any state
     // that would cause a loop — paramId is the only driver here.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [paramId])
+  }, [paramId]);
 
   async function handleSubmit(e: { preventDefault(): void }) {
-    e.preventDefault()
-    runVerify(certId)
+    e.preventDefault();
+    runVerify(certId);
   }
 
   const fmtDate = (iso: string) =>
-    new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+    new Date(iso).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
 
   return (
     <div className="verify-shell">
-      <Link to="/" className="page-back-link">← Back to Home</Link>
+      <Link to="/" className="page-back-link">
+        ← Back to Home
+      </Link>
 
       <div className="verify-hero">
         <h1>Verify a Certificate</h1>
-        <p>Enter the certificate ID printed on the certificate to confirm its authenticity and current status.</p>
+        <p>
+          Enter the certificate ID printed on the certificate to confirm its
+          authenticity and current status.
+        </p>
       </div>
 
       <form onSubmit={handleSubmit} className="verify-form">
@@ -1701,38 +2656,63 @@ function VerifyPage() {
           className="verify-input"
         />
         <button type="submit" className="verify-submit" disabled={loading}>
-          {loading ? 'Checking…' : 'Verify'}
+          {loading ? "Checking…" : "Verify"}
         </button>
       </form>
 
-      {result === 'not-found' && (
+      {result === "not-found" && (
         <div className="verify-result verify-result--invalid">
-          <span className="verify-badge verify-badge--invalid">✗ Certificate Not Found</span>
-          <p style={{ fontFamily: 'var(--font-ui)', fontSize: '0.875rem', color: 'var(--color-error)' }}>
-            No certificate was found with that ID. Please check that the ID is entered exactly as printed — it should follow the format <strong>WCI-EEO-XXXXXX</strong> and is case-insensitive.
+          <span className="verify-badge verify-badge--invalid">
+            ✗ Certificate Not Found
+          </span>
+          <p
+            style={{
+              fontFamily: "var(--font-ui)",
+              fontSize: "0.875rem",
+              color: "var(--color-error)",
+            }}
+          >
+            No certificate was found with that ID. Please check that the ID is
+            entered exactly as printed — it should follow the format{" "}
+            <strong>WCI-EEO-XXXXXX</strong> and is case-insensitive.
           </p>
         </div>
       )}
 
-      {result === 'error' && (
+      {result === "error" && (
         <div className="verify-result verify-result--invalid">
-          <span className="verify-badge verify-badge--invalid">⚠ Verification Unavailable</span>
-          <p style={{ fontFamily: 'var(--font-ui)', fontSize: '0.875rem', color: 'var(--color-error)' }}>
-            We were unable to complete the verification check. Please try again in a moment.
+          <span className="verify-badge verify-badge--invalid">
+            ⚠ Verification Unavailable
+          </span>
+          <p
+            style={{
+              fontFamily: "var(--font-ui)",
+              fontSize: "0.875rem",
+              color: "var(--color-error)",
+            }}
+          >
+            We were unable to complete the verification check. Please try again
+            in a moment.
           </p>
         </div>
       )}
 
-      {result && result !== 'not-found' && result !== 'error' && (
-        <div className={`verify-result ${result.status === 'Valid' ? 'verify-result--valid' : 'verify-result--invalid'}`}>
-          <span className={`verify-badge ${result.status === 'Valid' ? 'verify-badge--valid' : 'verify-badge--invalid'}`}>
-            {result.status === 'Valid' ? '✓ Valid Certificate' : '⚠ Expired Certificate'}
+      {result && result !== "not-found" && result !== "error" && (
+        <div
+          className={`verify-result ${result.status === "Valid" ? "verify-result--valid" : "verify-result--invalid"}`}
+        >
+          <span
+            className={`verify-badge ${result.status === "Valid" ? "verify-badge--valid" : "verify-badge--invalid"}`}
+          >
+            {result.status === "Valid"
+              ? "✓ Valid Certificate"
+              : "⚠ Expired Certificate"}
           </span>
           <table className="verify-detail-table">
             <tbody>
               <tr>
                 <td>Name</td>
-                <td>{result.fullName ?? '—'}</td>
+                <td>{result.fullName ?? "—"}</td>
               </tr>
               <tr>
                 <td>Certification</td>
@@ -1752,8 +2732,18 @@ function VerifyPage() {
               </tr>
               <tr>
                 <td>Status</td>
-                <td style={{ color: result.status === 'Valid' ? 'var(--color-success)' : 'var(--color-error)', fontWeight: 600 }}>
-                  {result.status === 'Valid' ? 'Valid — Certification is current' : 'Expired — Certification is no longer active'}
+                <td
+                  style={{
+                    color:
+                      result.status === "Valid"
+                        ? "var(--color-success)"
+                        : "var(--color-error)",
+                    fontWeight: 600,
+                  }}
+                >
+                  {result.status === "Valid"
+                    ? "Valid — Certification is current"
+                    : "Expired — Certification is no longer active"}
                 </td>
               </tr>
             </tbody>
@@ -1761,77 +2751,87 @@ function VerifyPage() {
         </div>
       )}
     </div>
-  )
+  );
 }
 
 // ─── Checkout Pages ───────────────────────────────────────────────────────────
 
-const POLL_INTERVAL_MS = 2000
-const POLL_TIMEOUT_MS = 30000
+const POLL_INTERVAL_MS = 2000;
+const POLL_TIMEOUT_MS = 30000;
 
 function CheckoutSuccessPage() {
-  const { refetchPaidStatus, paid } = useCompletion()
-  const { isLoaded, isSignedIn } = useUser()
-  const [timedOut, setTimedOut] = useState(false)
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const { refetchPaidStatus, paid } = useCompletion();
+  const { isLoaded, isSignedIn } = useUser();
+  const [timedOut, setTimedOut] = useState(false);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function stopPolling() {
     if (intervalRef.current !== null) {
-      clearInterval(intervalRef.current)
-      intervalRef.current = null
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
     }
     if (timeoutRef.current !== null) {
-      clearTimeout(timeoutRef.current)
-      timeoutRef.current = null
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
     }
   }
 
   useEffect(() => {
-    if (!isLoaded || !isSignedIn) return
+    if (!isLoaded || !isSignedIn) return;
 
     // Kick off first check immediately, then poll every 2s until paid or timeout.
-    refetchPaidStatus()
+    refetchPaidStatus();
 
     intervalRef.current = setInterval(() => {
-      refetchPaidStatus()
-    }, POLL_INTERVAL_MS)
+      refetchPaidStatus();
+    }, POLL_INTERVAL_MS);
 
     timeoutRef.current = setTimeout(() => {
-      stopPolling()
-      setTimedOut(true)
-    }, POLL_TIMEOUT_MS)
+      stopPolling();
+      setTimedOut(true);
+    }, POLL_TIMEOUT_MS);
 
-    return stopPolling
+    return stopPolling;
     // refetchPaidStatus is stable (defined outside render); intentionally omitted
     // from deps so the poll starts once when Clerk resolves, not on every re-render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoaded, isSignedIn])
+  }, [isLoaded, isSignedIn]);
 
   // Stop polling immediately when paid is confirmed.
   useEffect(() => {
-    if (paid) stopPolling()
+    if (paid) stopPolling();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [paid])
+  }, [paid]);
 
   if (paid) {
     return (
       <div className="checkout-shell">
         <h1>Payment Successful</h1>
-        <p>Your certification purchase was confirmed. You now have full access to the course.</p>
-        <Link to="/dashboard" className="btn-primary">Continue to Dashboard →</Link>
+        <p>
+          Your certification purchase was confirmed. You now have full access to
+          the course.
+        </p>
+        <Link to="/dashboard" className="btn-primary">
+          Continue to Dashboard →
+        </Link>
       </div>
-    )
+    );
   }
 
   if (timedOut) {
     return (
       <div className="checkout-shell">
         <h1>Payment Not Verified</h1>
-        <p>We couldn't confirm a completed payment for this account. If you believe this is an error, please contact support.</p>
-        <Link to="/" className="btn-secondary">Return Home →</Link>
+        <p>
+          We couldn't confirm a completed payment for this account. If you
+          believe this is an error, please contact support.
+        </p>
+        <Link to="/" className="btn-secondary">
+          Return Home →
+        </Link>
       </div>
-    )
+    );
   }
 
   return (
@@ -1839,254 +2839,320 @@ function CheckoutSuccessPage() {
       <h1>Verifying payment…</h1>
       <p>Please wait while we confirm your purchase.</p>
     </div>
-  )
+  );
 }
 
 function CheckoutCancelPage() {
   return (
     <div className="checkout-shell">
       <h1>Checkout Canceled</h1>
-      <p>Your purchase was not completed. You can try again whenever you're ready.</p>
-      <Link to="/" className="btn-secondary">Return Home →</Link>
+      <p>
+        Your purchase was not completed. You can try again whenever you're
+        ready.
+      </p>
+      <Link to="/" className="btn-secondary">
+        Return Home →
+      </Link>
     </div>
-  )
+  );
 }
 
 // ─── Guards ───────────────────────────────────────────────────────────────────
 
-const DEV_BYPASS_PAID_GUARD = false // TODO: remove before production
-
+const DEV_BYPASS_PAID_GUARD = false; // TODO: remove before production
 
 // Course routes now enforce the 60-day full-course access window.
 // Reads courseAccessActive from CompletionContext (sourced from /payment-status).
 function CourseAccessGuard({ children }: { children: React.ReactNode }) {
-  const { courseAccessActive, paidLoading } = useCompletion()
-  const { isLoaded: clerkLoaded, isSignedIn } = useUser()
-  if (DEV_BYPASS_PAID_GUARD) return <>{children}</>
-  if (!clerkLoaded || !isSignedIn || paidLoading) return null
-  if (!courseAccessActive) return <Navigate to="/" replace />
-  return <>{children}</>
+  const { courseAccessActive, paidLoading } = useCompletion();
+  const { isLoaded: clerkLoaded, isSignedIn } = useUser();
+  if (DEV_BYPASS_PAID_GUARD) return <>{children}</>;
+  if (!clerkLoaded || !isSignedIn || paidLoading) return null;
+  if (!courseAccessActive) return <Navigate to="/" replace />;
+  return <>{children}</>;
 }
 
 // Certificate access remains tied to certification validity, independent of course access window.
 // Allows access when course access is still active OR when the user holds a valid certification.
 function CertAccessGuard({ children }: { children: React.ReactNode }) {
-  const { courseAccessActive, paidLoading } = useCompletion()
-  const { isLoaded: clerkLoaded, isSignedIn } = useUser()
-  const { getToken } = useAuth()
-  const [certActive, setCertActive] = useState<boolean | null>(null)
+  const { courseAccessActive, paidLoading } = useCompletion();
+  const { isLoaded: clerkLoaded, isSignedIn } = useUser();
+  const { getToken } = useAuth();
+  const [certActive, setCertActive] = useState<boolean | null>(null);
 
   useEffect(() => {
-    if (!clerkLoaded || !isSignedIn) return
+    if (!clerkLoaded || !isSignedIn) return;
     getToken().then((token) => {
-      const base = import.meta.env.VITE_API_URL ?? ''
-      fetch(`${base}/my-certification`, { headers: { Authorization: `Bearer ${token}` } })
+      const base = import.meta.env.VITE_API_URL ?? "";
+      fetch(`${base}/my-certification`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
         .then((r) => r.json())
         .then((data) => {
-          setCertActive(!!(data?.expiresAt && new Date(data.expiresAt) > new Date()))
+          setCertActive(
+            !!(data?.expiresAt && new Date(data.expiresAt) > new Date()),
+          );
         })
-        .catch(() => setCertActive(false))
-    })
-  }, [clerkLoaded, isSignedIn, getToken])
+        .catch(() => setCertActive(false));
+    });
+  }, [clerkLoaded, isSignedIn, getToken]);
 
-  if (DEV_BYPASS_PAID_GUARD) return <>{children}</>
-  if (!clerkLoaded || !isSignedIn || paidLoading || certActive === null) return null
-  if (!courseAccessActive && !certActive) return <Navigate to="/" replace />
-  return <>{children}</>
+  if (DEV_BYPASS_PAID_GUARD) return <>{children}</>;
+  if (!clerkLoaded || !isSignedIn || paidLoading || certActive === null)
+    return null;
+  if (!courseAccessActive && !certActive) return <Navigate to="/" replace />;
+  return <>{children}</>;
 }
 
 // Dashboard access is now based on owned exams, not the legacy single-exam paid flag.
 // Fetches /my-exams and allows access when the user owns at least one exam.
 function OwnedExamsGuard({ children }: { children: React.ReactNode }) {
-  const { isLoaded: clerkLoaded, isSignedIn } = useUser()
-  const { getToken } = useAuth()
-  const [hasExams, setHasExams] = useState<boolean | null>(null)
+  const { isLoaded: clerkLoaded, isSignedIn } = useUser();
+  const { getToken } = useAuth();
+  const [hasExams, setHasExams] = useState<boolean | null>(null);
 
   useEffect(() => {
-    if (!clerkLoaded || !isSignedIn) return
-    const base = import.meta.env.VITE_API_URL ?? ''
+    if (!clerkLoaded || !isSignedIn) return;
+    const base = import.meta.env.VITE_API_URL ?? "";
     getToken().then((token) => {
-      fetch(`${base}/my-exams`, { headers: { Authorization: `Bearer ${token}` } })
+      fetch(`${base}/my-exams`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
         .then((r) => r.json())
         .then((exams: ExamEntry[]) => setHasExams(exams.length > 0))
-        .catch(() => setHasExams(false))
-    })
-  }, [clerkLoaded, isSignedIn, getToken])
+        .catch(() => setHasExams(false));
+    });
+  }, [clerkLoaded, isSignedIn, getToken]);
 
-  if (!clerkLoaded || !isSignedIn || hasExams === null) return null
-  if (!hasExams) return <Navigate to="/" replace />
-  return <>{children}</>
+  if (!clerkLoaded || !isSignedIn || hasExams === null) return null;
+  if (!hasExams) return <Navigate to="/" replace />;
+  return <>{children}</>;
 }
 
 function ProtectedDashboard() {
   return (
     <>
-      <SignedIn><OwnedExamsGuard><DashboardPage /></OwnedExamsGuard></SignedIn>
-      <SignedOut><Navigate to="/sign-in" replace /></SignedOut>
+      <SignedIn>
+        <OwnedExamsGuard>
+          <DashboardPage />
+        </OwnedExamsGuard>
+      </SignedIn>
+      <SignedOut>
+        <Navigate to="/sign-in" replace />
+      </SignedOut>
     </>
-  )
+  );
 }
 
 function ProtectedCourse() {
   return (
     <>
-      <SignedIn><CourseAccessGuard><CoursePage /></CourseAccessGuard></SignedIn>
-      <SignedOut><Navigate to="/sign-in" replace /></SignedOut>
+      <SignedIn>
+        <CourseAccessGuard>
+          <CoursePage />
+        </CourseAccessGuard>
+      </SignedIn>
+      <SignedOut>
+        <Navigate to="/sign-in" replace />
+      </SignedOut>
     </>
-  )
+  );
 }
 
 function ProtectedLesson() {
   return (
     <>
-      <SignedIn><CourseAccessGuard><LessonPage /></CourseAccessGuard></SignedIn>
-      <SignedOut><Navigate to="/sign-in" replace /></SignedOut>
+      <SignedIn>
+        <CourseAccessGuard>
+          <LessonPage />
+        </CourseAccessGuard>
+      </SignedIn>
+      <SignedOut>
+        <Navigate to="/sign-in" replace />
+      </SignedOut>
     </>
-  )
+  );
 }
 
 function ProtectedQuiz() {
   return (
     <>
-      <SignedIn><CourseAccessGuard><QuizPage /></CourseAccessGuard></SignedIn>
-      <SignedOut><Navigate to="/sign-in" replace /></SignedOut>
+      <SignedIn>
+        <CourseAccessGuard>
+          <QuizPage />
+        </CourseAccessGuard>
+      </SignedIn>
+      <SignedOut>
+        <Navigate to="/sign-in" replace />
+      </SignedOut>
     </>
-  )
+  );
 }
 
 function ProtectedFinalExam() {
   return (
     <>
-      <SignedIn><CourseAccessGuard><FinalExamPage /></CourseAccessGuard></SignedIn>
-      <SignedOut><Navigate to="/sign-in" replace /></SignedOut>
+      <SignedIn>
+        <CourseAccessGuard>
+          <FinalExamPage />
+        </CourseAccessGuard>
+      </SignedIn>
+      <SignedOut>
+        <Navigate to="/sign-in" replace />
+      </SignedOut>
     </>
-  )
+  );
 }
 
 function ProtectedCertificate() {
   return (
     <>
-      <SignedIn><CertAccessGuard><CertificatePage /></CertAccessGuard></SignedIn>
-      <SignedOut><Navigate to="/sign-in" replace /></SignedOut>
+      <SignedIn>
+        <CertAccessGuard>
+          <CertificatePage />
+        </CertAccessGuard>
+      </SignedIn>
+      <SignedOut>
+        <Navigate to="/sign-in" replace />
+      </SignedOut>
     </>
-  )
+  );
 }
 
 // ─── Root ─────────────────────────────────────────────────────────────────────
 
 export default function App() {
-  const { user } = useUser()
-  const { getToken } = useAuth()
-  const userId = user?.id ?? null
+  const { user } = useUser();
+  const { getToken } = useAuth();
+  const userId = user?.id ?? null;
 
   // State starts empty; useEffect below loads the correct user's data once
   // Clerk resolves the session and whenever the active user changes.
-  const [completed, setCompleted] = useState<Set<string>>(new Set())
-  const [quizResults, setQuizResults] = useState<Record<string, QuizResult>>({})
-  const [finalExamResult, setFinalExamResultState] = useState<QuizResult | null>(null)
-  const [paid, setPaidState] = useState<boolean>(false)
-  const [courseAccessActive, setCourseAccessActive] = useState<boolean>(false)
-  const [paidLoading, setPaidLoading] = useState<boolean>(true)
+  const [completed, setCompleted] = useState<Set<string>>(new Set());
+  const [quizResults, setQuizResults] = useState<Record<string, QuizResult>>(
+    {},
+  );
+  const [finalExamResult, setFinalExamResultState] =
+    useState<QuizResult | null>(null);
+  const [paid, setPaidState] = useState<boolean>(false);
+  const [courseAccessActive, setCourseAccessActive] = useState<boolean>(false);
+  const [paidLoading, setPaidLoading] = useState<boolean>(true);
 
   useEffect(() => {
     if (!userId) {
       // No authenticated user — reset everything to clean defaults.
-      setCompleted(new Set())
-      setQuizResults({})
-      setFinalExamResultState(null)
-      setPaidState(false)
-      setCourseAccessActive(false)
-      setPaidLoading(false)
-      return
+      setCompleted(new Set());
+      setQuizResults({});
+      setFinalExamResultState(null);
+      setPaidState(false);
+      setCourseAccessActive(false);
+      setPaidLoading(false);
+      return;
     }
     try {
-      const s = localStorage.getItem(`wci_completed_lessons_${userId}`)
-      setCompleted(s ? new Set(JSON.parse(s)) : new Set())
-    } catch { setCompleted(new Set()) }
+      const s = localStorage.getItem(`wci_completed_lessons_${userId}`);
+      setCompleted(s ? new Set(JSON.parse(s)) : new Set());
+    } catch {
+      setCompleted(new Set());
+    }
 
     try {
-      const s = localStorage.getItem(`wci_quiz_results_${userId}`)
-      setQuizResults(s ? JSON.parse(s) : {})
-    } catch { setQuizResults({}) }
+      const s = localStorage.getItem(`wci_quiz_results_${userId}`);
+      setQuizResults(s ? JSON.parse(s) : {});
+    } catch {
+      setQuizResults({});
+    }
 
     // Seed from localStorage immediately for instant UI.
-    const examLocal = localStorage.getItem(`wci_final_exam_result_${userId}`)
-    setFinalExamResultState(examLocal === 'passed' || examLocal === 'failed' ? examLocal : null)
+    const examLocal = localStorage.getItem(`wci_final_exam_result_${userId}`);
+    setFinalExamResultState(
+      examLocal === "passed" || examLocal === "failed" ? examLocal : null,
+    );
 
     // Fetch paid status from the server — this is the authoritative source.
-    const controller = new AbortController()
-    loadPaidStatus(userId, controller.signal)
+    const controller = new AbortController();
+    loadPaidStatus(userId, controller.signal);
 
     // Override with server truth: if UserCertification exists with a valid expiry,
     // mark as passed regardless of localStorage (recovers cleared-storage users).
-    const base = import.meta.env.VITE_API_URL ?? ''
-    getToken({ skipCache: true }).then((token) => {
-      if (controller.signal.aborted) return
-      return fetch(`${base}/my-certification`, {
-        headers: { Authorization: `Bearer ${token}` },
-        signal: controller.signal,
-      })
-        .then((r) => r.json())
-        .then((data) => {
-          if (data?.expiresAt && new Date(data.expiresAt) > new Date()) {
-            setFinalExamResultState('passed')
-            localStorage.setItem(`wci_final_exam_result_${userId}`, 'passed')
-          }
+    const base = import.meta.env.VITE_API_URL ?? "";
+    getToken({ skipCache: true })
+      .then((token) => {
+        if (controller.signal.aborted) return;
+        return fetch(`${base}/my-certification`, {
+          headers: { Authorization: `Bearer ${token}` },
+          signal: controller.signal,
         })
-        .catch(() => {}) // network failure — keep localStorage value
-    }).catch(() => {})
+          .then((r) => r.json())
+          .then((data) => {
+            if (data?.expiresAt && new Date(data.expiresAt) > new Date()) {
+              setFinalExamResultState("passed");
+              localStorage.setItem(`wci_final_exam_result_${userId}`, "passed");
+            }
+          })
+          .catch(() => {}); // network failure — keep localStorage value
+      })
+      .catch(() => {});
 
-    return () => { controller.abort() }
-  }, [userId, getToken])
+    return () => {
+      controller.abort();
+    };
+  }, [userId, getToken]);
 
   const loadPaidStatus = (uid: string, signal?: AbortSignal) => {
-    const base = import.meta.env.VITE_API_URL ?? ''
-    setPaidLoading(true)
+    const base = import.meta.env.VITE_API_URL ?? "";
+    setPaidLoading(true);
     fetch(`${base}/payment-status?clerkUserId=${uid}`, { signal })
-      .then((res) => { if (!res.ok) throw new Error(`${res.status}`); return res.json() })
+      .then((res) => {
+        if (!res.ok) throw new Error(`${res.status}`);
+        return res.json();
+      })
       .then((data) => {
-        setPaidState(data.paid === true)
-        setCourseAccessActive(data.courseAccessActive === true)
-        setPaidLoading(false)
+        setPaidState(data.paid === true);
+        setCourseAccessActive(data.courseAccessActive === true);
+        setPaidLoading(false);
       })
       .catch((err) => {
-        if (err.name === 'AbortError') return
+        if (err.name === "AbortError") return;
         // Network error: fall back to localStorage so the app stays usable offline
-        setPaidState(localStorage.getItem(`wci_paid_user_${uid}`) === 'true')
-        setCourseAccessActive(false)
-        setPaidLoading(false)
-      })
-  }
+        setPaidState(localStorage.getItem(`wci_paid_user_${uid}`) === "true");
+        setCourseAccessActive(false);
+        setPaidLoading(false);
+      });
+  };
 
   const toggle = (id: string) => {
-    if (!userId) return
+    if (!userId) return;
     setCompleted((prev) => {
-      const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
-      localStorage.setItem(`wci_completed_lessons_${userId}`, JSON.stringify([...next]))
-      return next
-    })
-  }
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      localStorage.setItem(
+        `wci_completed_lessons_${userId}`,
+        JSON.stringify([...next]),
+      );
+      return next;
+    });
+  };
 
   const setQuizResult = (sectionId: string, result: QuizResult) => {
-    if (!userId) return
+    if (!userId) return;
     setQuizResults((prev) => {
-      const next = { ...prev, [sectionId]: result }
-      localStorage.setItem(`wci_quiz_results_${userId}`, JSON.stringify(next))
-      return next
-    })
-  }
+      const next = { ...prev, [sectionId]: result };
+      localStorage.setItem(`wci_quiz_results_${userId}`, JSON.stringify(next));
+      return next;
+    });
+  };
 
   const setFinalExamResult = (result: QuizResult) => {
-    if (!userId) return
-    localStorage.setItem(`wci_final_exam_result_${userId}`, result)
-    setFinalExamResultState(result)
-  }
+    if (!userId) return;
+    localStorage.setItem(`wci_final_exam_result_${userId}`, result);
+    setFinalExamResultState(result);
+  };
 
   const refetchPaidStatus = () => {
-    if (!userId) return
-    loadPaidStatus(userId)
-  }
+    if (!userId) return;
+    loadPaidStatus(userId);
+  };
 
   return (
     <CompletionContext.Provider
@@ -2106,8 +3172,66 @@ export default function App() {
       <Routes>
         <Route path="/" element={<CatalogPage />} />
         <Route path={EEO_EXAM_PATH} element={<EeoDetailPage />} />
-        <Route path="/sign-in/*" element={<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 'var(--sp-10)' }}><div style={{ width: 'fit-content' }}><Link to="/" className="page-back-link" style={{ display: 'inline-block', marginBottom: '12px', color: 'var(--text-secondary)', fontWeight: 600, textDecoration: 'underline' }}>← Back to Home</Link><SignIn routing="path" path="/sign-in" /></div></div>} />
-        <Route path="/sign-up/*" element={<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 'var(--sp-10)' }}><div style={{ width: 'fit-content' }}><Link to="/" className="page-back-link" style={{ display: 'inline-block', marginBottom: '12px', color: 'var(--text-secondary)', fontWeight: 600, textDecoration: 'underline' }}>← Back to Home</Link><SignUp routing="path" path="/sign-up" /></div></div>} />
+        <Route
+          path="/sign-in/*"
+          element={
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                paddingTop: "var(--sp-10)",
+              }}
+            >
+              <div style={{ width: "fit-content" }}>
+                <Link
+                  to="/"
+                  className="page-back-link"
+                  style={{
+                    display: "inline-block",
+                    marginBottom: "12px",
+                    color: "var(--text-secondary)",
+                    fontWeight: 600,
+                    textDecoration: "underline",
+                  }}
+                >
+                  ← Back to Home
+                </Link>
+                <SignIn routing="path" path="/sign-in" />
+              </div>
+            </div>
+          }
+        />
+        <Route
+          path="/sign-up/*"
+          element={
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                paddingTop: "var(--sp-10)",
+              }}
+            >
+              <div style={{ width: "fit-content" }}>
+                <Link
+                  to="/"
+                  className="page-back-link"
+                  style={{
+                    display: "inline-block",
+                    marginBottom: "12px",
+                    color: "var(--text-secondary)",
+                    fontWeight: 600,
+                    textDecoration: "underline",
+                  }}
+                >
+                  ← Back to Home
+                </Link>
+                <SignUp routing="path" path="/sign-up" />
+              </div>
+            </div>
+          }
+        />
         <Route path="/dashboard" element={<ProtectedDashboard />} />
         <Route path="/course" element={<ProtectedCourse />} />
         <Route path="/lesson/:id" element={<ProtectedLesson />} />
@@ -2118,9 +3242,30 @@ export default function App() {
         <Route path="/checkout-success" element={<CheckoutSuccessPage />} />
         <Route path="/checkout-cancel" element={<CheckoutCancelPage />} />
         <Route path="/ceu" element={<ProtectedCeu />} />
-        <Route path="/admin/sign-in/*" element={<SignIn routing="path" path="/admin/sign-in" fallbackRedirectUrl="/admin/ai-content" />} />
-        <Route path="/admin/ai-content" element={<><SignedIn><AdminAiContentPage /></SignedIn><SignedOut><Navigate to="/admin/sign-in" replace /></SignedOut></>} />
+        <Route
+          path="/admin/sign-in/*"
+          element={
+            <SignIn
+              routing="path"
+              path="/admin/sign-in"
+              fallbackRedirectUrl="/admin/ai-content"
+            />
+          }
+        />
+        <Route
+          path="/admin/ai-content"
+          element={
+            <>
+              <SignedIn>
+                <AdminAiContentPage />
+              </SignedIn>
+              <SignedOut>
+                <Navigate to="/admin/sign-in" replace />
+              </SignedOut>
+            </>
+          }
+        />
       </Routes>
     </CompletionContext.Provider>
-  )
+  );
 }
