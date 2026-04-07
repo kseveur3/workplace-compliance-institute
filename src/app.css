@@ -280,9 +280,11 @@ button {
 
 /* ── Section block (course page) ─────────── */
 .section-block {
-  margin-top: var(--sp-10);
-  padding-top: var(--sp-6);
-  border-top: 1px solid var(--border);
+  margin-top: var(--sp-6);
+  padding: var(--sp-6);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
 }
 
 .section-block h2 {
@@ -310,7 +312,7 @@ button {
 .lesson-list {
   display: flex;
   flex-direction: column;
-  gap: 0;
+  gap: var(--sp-2);
   margin-bottom: var(--sp-4);
 }
 
@@ -322,15 +324,19 @@ button {
   font-size: 0.9rem;
   font-weight: 500;
   color: var(--text-secondary);
-  padding: var(--sp-3) var(--sp-4);
+  padding: var(--sp-3) var(--sp-4) var(--sp-3) var(--sp-2);
   border-radius: var(--r-md);
-  transition: background 0.15s, color 0.15s;
+  border-left: 2px solid var(--border);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
 
 .lesson-list a:hover {
-  background: var(--teal-50);
-  color: var(--navy);
+  background: var(--bg-warm);
+  color: var(--text-primary);
+  border-left-color: var(--teal);
 }
+
 
 /* Checkmark prefix for completed lessons */
 .lesson-list a[href]:not([href=""]) {
@@ -368,6 +374,38 @@ button {
   text-transform: uppercase;
 }
 
+/* ── Spinner ─────────────────────────────── */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.spinner {
+  display: inline-block;
+  width: 13px;
+  height: 13px;
+  border: 2px solid var(--border);
+  border-top-color: var(--teal);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+.spinner--md {
+  width: 16px;
+  height: 16px;
+  border-width: 2.5px;
+  border-top-color: var(--teal);
+}
+
+.spinner--lg {
+  width: 17px;
+  height: 17px;
+  border-width: 2.5px;
+  border-color: var(--teal-100);
+  border-top-color: var(--teal);
+  opacity: 0.8;
+}
+
 /* ── Page header ─────────────────────────── */
 .page-header {
   margin-bottom: var(--sp-6);
@@ -386,6 +424,63 @@ button {
   font-family: var(--font-ui);
   font-size: 0.875rem;
   color: var(--text-muted);
+}
+
+/* ── Lesson progress bar ─────────────────── */
+.lesson-progress-bar {
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: var(--sp-4);
+}
+
+.lesson-progress-fill {
+  height: 100%;
+  background: var(--teal);
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+/* ── Course-level progress bar (dashboard + course page) ── */
+.dash-progress-unit {
+  margin-bottom: var(--sp-1);
+}
+.dash-progress-unit .dash-course-progress {
+  padding-top: 0;
+  border-top: none;
+  margin-top: 0;
+}
+.dash-progress-headline {
+  margin-bottom: var(--sp-2);
+}
+.dash-progress-label {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+.course-progress-bar {
+  height: 8px;
+  background: color-mix(in srgb, var(--border) 60%, var(--text-muted) 40%);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: var(--sp-1);
+}
+.course-progress-fill {
+  height: 100%;
+  background: var(--teal);
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+/* ── Lesson position counter ─────────────── */
+.lesson-position {
+  font-family: var(--font-ui);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: var(--sp-1);
 }
 
 /* ── Lesson page ─────────────────────────── */
@@ -509,7 +604,7 @@ button {
   display: flex;
   align-items: center;
   gap: var(--sp-4);
-  margin-top: var(--sp-6);
+  margin-top: var(--sp-3);
 }
 
 /* ── Link-styled button ───────────────────── */
