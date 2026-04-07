@@ -20,6 +20,7 @@ import {
   useAuth,
 } from "@clerk/clerk-react";
 import "./app.css";
+import { displayTitle } from "./utils/lessonTitle";
 
 interface Lesson {
   id: string;
@@ -279,6 +280,15 @@ function loadActiveCourse(): Course {
     if (raw) {
       const gen = JSON.parse(raw);
       console.log("Using generated certification");
+      // Map index → real section title from curriculumOutline.
+      // curriculumOutline[i].section is "Section N: <Title>"; we want only "<Title>".
+      const outlineTitles: string[] = Array.isArray(gen.curriculumOutline)
+        ? (gen.curriculumOutline as { section: string }[]).map((o) => {
+            const colon = o.section.indexOf(":");
+            return colon >= 0 ? o.section.slice(colon + 2).trim() : o.section;
+          })
+        : [];
+
       const sections: Section[] = (
         gen.lessons as {
           section: string;
@@ -290,7 +300,7 @@ function loadActiveCourse(): Course {
         }[]
       ).map((group, si) => ({
         id: `section-${si + 1}`,
-        title: group.section,
+        title: `Section ${si + 1} \u2014 ${outlineTitles[si] ?? group.section}`,
         lessons: group.lessons.map((lesson, li) => ({
           id: `lesson-${si + 1}-${li + 1}`,
           title: lesson.title,
@@ -1326,6 +1336,27 @@ function DashboardPage() {
                   included.
                 </p>
               )}
+              {!isCeuOnly && isEeo && !exam.certification && (() => {
+                const pct = Math.round((completed.size / totalLessons) * 100);
+                return (
+                  <div className="dash-progress-unit">
+                    <p className="dash-course-progress dash-progress-headline">
+                      {pct === 0
+                        ? <><span className="dash-progress-label">Not started yet</span> &middot; <strong>0%</strong> complete</>
+                        : <><strong>{pct}%</strong> complete</>
+                      }
+                    </p>
+                    <div className="course-progress-bar">
+                      <div className="course-progress-fill" style={{ width: `${pct}%` }} />
+                    </div>
+                    <p className="dash-course-progress">
+                      {completed.size} of {totalLessons} lessons
+                      {quizzesPassed > 0 &&
+                        ` · ${quizzesPassed} of ${ACTIVE_COURSE.sections.length} quizzes passed`}
+                    </p>
+                  </div>
+                );
+              })()}
               {accessText && !exam.certification && courseAccessActive && (
                 <p className="dash-course-progress">{accessText}</p>
               )}
@@ -1339,13 +1370,6 @@ function DashboardPage() {
                     certification.
                   </p>
                 )}
-              {!isCeuOnly && isEeo && !exam.certification && (
-                <p className="dash-course-progress">
-                  {completed.size} of {totalLessons} lessons completed
-                  {quizzesPassed > 0 &&
-                    ` · ${quizzesPassed} of ${ACTIVE_COURSE.sections.length} section quizzes passed`}
-                </p>
-              )}
               {ceuText && <p className="dash-course-progress">{ceuText}</p>}
             </div>
             {isEeo && (
@@ -1360,11 +1384,30 @@ function DashboardPage() {
                   </Link>
                 )}
                 {/* Full-course, not yet certified, access active: primary action is the course */}
-                {!isCeuOnly && !exam.certification && courseAccessActive && (
-                  <Link to="/course" className="btn-primary">
-                    View Course
-                  </Link>
-                )}
+                {!isCeuOnly && !exam.certification && courseAccessActive && (() => {
+                  const raw = localStorage.getItem("courseProgress");
+                  const prog = raw ? JSON.parse(raw) : null;
+                  const hasProgress = prog !== null && completed.size > 0;
+                  const to = prog
+                    ? `/course?section=${prog.sectionIndex}&lesson=${prog.lessonIndex}`
+                    : "/course";
+                  const nextLesson = prog
+                    ? ACTIVE_COURSE.sections[prog.sectionIndex]?.lessons[prog.lessonIndex]
+                    : null;
+                  const nextTitle = nextLesson ? displayTitle(nextLesson.title) : null;
+                  return (
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "var(--sp-1)" }}>
+                      <Link to={to} className="btn-primary">
+                        {hasProgress ? "Resume Course" : completed.size === 0 ? "Start Course" : "Continue Course"}
+                      </Link>
+                      {hasProgress && nextTitle && (
+                        <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", fontFamily: "var(--font-ui)" }}>
+                          Next: {nextTitle}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })()}
                 {/* Full-course, not yet certified, access expired: offer extension purchase */}
                 {!isCeuOnly && !exam.certification && !courseAccessActive && (
                   <button
@@ -1414,6 +1457,22 @@ function CoursePage() {
   const { getToken } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Resume: read ?section=X&lesson=Y and navigate directly to that lesson
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const si = params.get("section");
+    const li = params.get("lesson");
+    if (si !== null && li !== null) {
+      const section = ACTIVE_COURSE.sections[Number(si)];
+      const lesson = section?.lessons[Number(li)];
+      if (lesson) {
+        navigate(`/lesson/${lesson.id}`, { replace: true });
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const quizSummary = (
     location.state as {
       quizSummary?: {
@@ -1482,8 +1541,14 @@ function CoursePage() {
         <div className="page-header">
           <h1 className="page-title">{ACTIVE_COURSE.title}</h1>
           <p className="page-subtitle">
-            Progress: {completed.size} of {TOTAL_LESSONS} lessons completed
+            {Math.round((completed.size / TOTAL_LESSONS) * 100)}% complete &middot; {completed.size} of {TOTAL_LESSONS} lessons
           </p>
+          <div className="course-progress-bar" style={{ marginTop: "var(--sp-3)" }}>
+            <div
+              className="course-progress-fill"
+              style={{ width: `${Math.round((completed.size / TOTAL_LESSONS) * 100)}%` }}
+            />
+          </div>
         </div>
 
         {/* Certification requirements */}
@@ -1542,7 +1607,7 @@ function CoursePage() {
             >
               {quizSummary.passed
                 ? "Section passed."
-                : "You must review the section before retrying."}
+                : "You did not pass. Review the section and try again."}
             </span>
           </div>
         )}
@@ -1609,7 +1674,7 @@ function CoursePage() {
                 {section.lessons.map((lesson) => (
                   <Link key={lesson.id} to={`/lesson/${lesson.id}`}>
                     {completed.has(lesson.id) ? "✓ " : ""}
-                    {lesson.title}
+                    {displayTitle(lesson.title)}
                   </Link>
                 ))}
               </div>
@@ -1683,7 +1748,7 @@ function CoursePage() {
 
 function LessonPage() {
   const { id } = useParams<{ id: string }>();
-  const { completed, toggle } = useCompletion();
+  const { completed, toggle, quizResults } = useCompletion();
 
   let foundLesson: {
     section: (typeof ACTIVE_COURSE.sections)[0];
@@ -1715,16 +1780,92 @@ function LessonPage() {
   const nextLesson =
     lessonIndex < ALL_LESSONS.length - 1 ? ALL_LESSONS[lessonIndex + 1] : null;
   const isDone = completed.has(lesson.id);
+  const lessonDisplayTitle = displayTitle(lesson.title);
+
+  // Progress calculations — sectionIndex must come before section-boundary logic
+  const sectionIndex = ACTIVE_COURSE.sections.findIndex((s) => s.id === section.id);
+
+  // Section-boundary next-step logic
+  const lessonIndexInSection = section.lessons.findIndex((l) => l.id === lesson.id);
+  const isLastInSection = lessonIndexInSection === section.lessons.length - 1;
+  const sectionQuizPassed = quizResults[section.id] === "passed";
+  const nextSection = sectionIndex < ACTIVE_COURSE.sections.length - 1
+    ? ACTIVE_COURSE.sections[sectionIndex + 1]
+    : null;
+
+  // Scroll to top on every new lesson
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "auto" });
+  }, [lesson.id]);
+
+  // Save resume position
+  useEffect(() => {
+    localStorage.setItem(
+      "courseProgress",
+      JSON.stringify({ sectionIndex, lessonIndex })
+    );
+  }, [sectionIndex, lessonIndex]);
+
+  // Auto-complete when user reaches the bottom of the lesson content
+  const bottomSentinelRef = useRef<HTMLDivElement>(null);
+  const [autoCompleted, setAutoCompleted] = useState(false);
+  const [hasUserScrolled, setHasUserScrolled] = useState(false);
+
+  // Reset both flags when navigating to a new lesson
+  useEffect(() => {
+    setAutoCompleted(false);
+    setHasUserScrolled(false);
+  }, [lesson.id]);
+
+  // Set hasUserScrolled on first real scroll event
+  useEffect(() => {
+    const onScroll = () => setHasUserScrolled(true);
+    window.addEventListener("scroll", onScroll, { once: true, passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [lesson.id]);
+
+  useEffect(() => {
+    const sentinel = bottomSentinelRef.current;
+    if (!sentinel) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && hasUserScrolled && !isDone) {
+          toggle(lesson.id);
+          setAutoCompleted(true);
+          observer.disconnect();
+        }
+      },
+      { threshold: 1.0 }
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  // Re-run when lesson changes or hasUserScrolled flips to true.
+  // isDone intentionally excluded so the observer won't re-fire after the toggle.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lesson.id, hasUserScrolled]);
+
+  const overallProgressPct = Math.round(((lessonIndex + 1) / ALL_LESSONS.length) * 100);
 
   return (
     <div className="page-shell">
+      <div className="lesson-progress-bar">
+        <div className="lesson-progress-fill" style={{ width: `${overallProgressPct}%` }} />
+      </div>
+
       <Link to="/course" className="page-back-link">
         ← Back to Course
       </Link>
 
       <div className="lesson-header">
+        <p className="lesson-position">
+          Section {sectionIndex + 1} of {ACTIVE_COURSE.sections.length}
+          &nbsp;·&nbsp;
+          Lesson {lessonIndex + 1} of {ALL_LESSONS.length}
+        </p>
         <p className="lesson-section-label">{section.title}</p>
-        <h1 className="lesson-title">{lesson.title}</h1>
+        <h1 className="lesson-title">{lessonDisplayTitle}</h1>
         <p className="lesson-meta">{lesson.estimatedTime}</p>
       </div>
 
@@ -1732,9 +1873,10 @@ function LessonPage() {
         {lesson.content.map((p, i) => (
           <p key={i}>{p}</p>
         ))}
+        <div ref={bottomSentinelRef} />
       </div>
 
-      <div className="lesson-audio">{lesson.narrationPlaceholder}</div>
+      <div className="lesson-audio">{`Audio narration for ${lessonDisplayTitle} coming soon.`}</div>
 
       <div className="lesson-complete-row">
         <button onClick={() => toggle(lesson.id)}>
@@ -1746,7 +1888,7 @@ function LessonPage() {
             color: isDone ? "var(--color-success)" : "var(--text-muted)",
           }}
         >
-          {isDone ? "✓ Completed" : "Not completed"}
+          {autoCompleted ? "✓ Lesson completed" : isDone ? "✓ Completed" : "Not completed"}
         </span>
       </div>
 
@@ -1756,8 +1898,16 @@ function LessonPage() {
         ) : (
           <span />
         )}
-        {nextLesson && (
-          <Link to={`/lesson/${nextLesson.id}`}>Next Lesson →</Link>
+        {isLastInSection ? (
+          sectionQuizPassed && nextSection ? (
+            <Link to={`/lesson/${nextSection.lessons[0].id}`}>Next Section →</Link>
+          ) : (
+            <Link to={`/quiz/${section.id}`}>Take Section Quiz →</Link>
+          )
+        ) : (
+          nextLesson && (
+            <Link to={`/lesson/${nextLesson.id}`}>Next Lesson →</Link>
+          )
         )}
       </div>
 
@@ -1774,7 +1924,6 @@ function LessonPage() {
 function QuizPage() {
   const { sectionId } = useParams<{ sectionId: string }>();
   const { setQuizResult } = useCompletion();
-  const navigate = useNavigate();
 
   const quiz = ACTIVE_QUIZZES.find((q) => q.sectionId === sectionId);
   const section = ACTIVE_COURSE.sections.find((s) => s.id === sectionId);
@@ -1783,6 +1932,9 @@ function QuizPage() {
   const [answers, setAnswers] = useState<(number | null)[]>(() =>
     quiz ? Array(quiz.questions.length).fill(null) : [],
   );
+  const [confirmed, setConfirmed] = useState(false);
+  const [showResults, setShowResults] = useState(false);
+  const [finalScore, setFinalScore] = useState<{ correct: number; total: number; passed: boolean } | null>(null);
 
   if (!quiz || !section) {
     return (
@@ -1798,8 +1950,70 @@ function QuizPage() {
   const question = quiz.questions[currentIndex];
   const selected = answers[currentIndex];
   const isLast = currentIndex === quiz.questions.length - 1;
-  const progressPct = Math.round((currentIndex / quiz.questions.length) * 100);
+  const progressPct = Math.round(((confirmed && isLast ? quiz.questions.length : currentIndex) / quiz.questions.length) * 100);
+  const isCorrect = confirmed && selected === question.correctIndex;
 
+  // Next-section CTA target
+  const sectionIdx = ACTIVE_COURSE.sections.findIndex((s) => s.id === sectionId);
+  const nextSection = sectionIdx >= 0 && sectionIdx < ACTIVE_COURSE.sections.length - 1
+    ? ACTIVE_COURSE.sections[sectionIdx + 1]
+    : null;
+  const nextSectionFirstLesson = nextSection?.lessons[0] ?? null;
+
+  // ── Results panel ─────────────────────────────────────────────────────────
+  if (showResults && finalScore) {
+    return (
+      <div className="quiz-shell">
+        <Link to="/course" className="page-back-link">← Back to Course</Link>
+        <p className="quiz-context">{section.title}</p>
+        <h1 className="quiz-heading">Quiz Results</h1>
+
+        <div
+          className="info-panel"
+          style={{
+            borderColor: finalScore.passed ? "var(--teal)" : "var(--color-error)",
+            marginBottom: "var(--sp-6)",
+          }}
+        >
+          <p style={{ fontSize: "1.5rem", fontWeight: 700, marginBottom: "var(--sp-1)" }}>
+            {finalScore.correct} / {finalScore.total} correct
+          </p>
+          <p style={{ color: "var(--text-muted)", fontFamily: "var(--font-ui)", fontSize: "0.875rem" }}>
+            {finalScore.passed
+              ? "You passed! Score meets the 80% passing threshold."
+              : `Score: ${Math.round((finalScore.correct / finalScore.total) * 100)}% — 80% required to pass.`}
+          </p>
+        </div>
+
+        {finalScore.passed ? (
+          nextSectionFirstLesson ? (
+            <Link to={`/lesson/${nextSectionFirstLesson.id}`} className="btn-primary">
+              Start Next Section →
+            </Link>
+          ) : (
+            <Link to="/course" className="btn-primary">
+              Back to Course
+            </Link>
+          )
+        ) : (
+          <button
+            className="btn-primary"
+            onClick={() => {
+              setCurrentIndex(0);
+              setAnswers(Array(quiz.questions.length).fill(null));
+              setConfirmed(false);
+              setShowResults(false);
+              setFinalScore(null);
+            }}
+          >
+            Retry Quiz
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  // ── Question panel ────────────────────────────────────────────────────────
   return (
     <div className="quiz-shell">
       <Link to="/course" className="page-back-link">
@@ -1810,10 +2024,7 @@ function QuizPage() {
       <h1 className="quiz-heading">Section Quiz</h1>
 
       <div className="quiz-progress">
-        <div
-          className="quiz-progress__fill"
-          style={{ width: `${progressPct}%` }}
-        />
+        <div className="quiz-progress__fill" style={{ width: `${progressPct}%` }} />
       </div>
 
       <p className="quiz-counter">
@@ -1823,28 +2034,67 @@ function QuizPage() {
       <p className="quiz-question">{question.question}</p>
 
       <div className="quiz-options">
-        {question.options.map((option, i) => (
-          <button
-            key={i}
-            className={`quiz-option${selected === i ? " quiz-option--selected" : ""}`}
-            onClick={() =>
-              setAnswers((prev) => {
-                const next = [...prev];
-                next[currentIndex] = i;
-                return next;
-              })
-            }
-          >
-            <span className="quiz-option__dot" />
-            <span className="quiz-option__label">{option}</span>
-          </button>
-        ))}
+        {question.options.map((option, i) => {
+          let cls = "quiz-option";
+          if (confirmed) {
+            if (i === question.correctIndex) cls += " quiz-option--correct";
+            else if (i === selected) cls += " quiz-option--incorrect";
+          } else if (selected === i) {
+            cls += " quiz-option--selected";
+          }
+          return (
+            <button
+              key={i}
+              className={cls}
+              disabled={confirmed}
+              onClick={() =>
+                setAnswers((prev) => {
+                  const next = [...prev];
+                  next[currentIndex] = i;
+                  return next;
+                })
+              }
+            >
+              <span className="quiz-option__dot" />
+              <span className="quiz-option__label">{option}</span>
+            </button>
+          );
+        })}
       </div>
+
+      {confirmed && (
+        <div className="quiz-feedback" style={{
+          marginTop: "var(--sp-4)",
+          padding: "var(--sp-4)",
+          borderRadius: "var(--r-md)",
+          background: isCorrect ? "var(--teal-50)" : "var(--color-error-bg)",
+          borderLeft: `3px solid ${isCorrect ? "var(--teal)" : "var(--color-error)"}`,
+        }}>
+          <p style={{ fontWeight: 600, marginBottom: "var(--sp-1)", fontFamily: "var(--font-ui)", fontSize: "0.875rem" }}>
+            {isCorrect ? "✓ Correct" : "✗ Incorrect"}
+          </p>
+          {!isCorrect && (
+            <p style={{ fontSize: "0.875rem", marginBottom: "var(--sp-1)", color: "var(--text-secondary)" }}>
+              Correct answer: {question.options[question.correctIndex]}
+            </p>
+          )}
+          {(question as { explanation?: string }).explanation && (
+            <p style={{ fontSize: "0.875rem", color: "var(--text-muted)" }}>
+              {(question as { explanation?: string }).explanation}
+            </p>
+          )}
+        </div>
+      )}
 
       <button
         className="quiz-submit"
         disabled={selected === null}
+        style={{ marginTop: "var(--sp-5)" }}
         onClick={() => {
+          if (!confirmed) {
+            setConfirmed(true);
+            return;
+          }
           if (isLast) {
             const correct = answers.filter(
               (a, i) => a === quiz.questions[i].correctIndex,
@@ -1852,22 +2102,15 @@ function QuizPage() {
             const total = quiz.questions.length;
             const passed = correct / total >= 0.8;
             setQuizResult(section.id, passed ? "passed" : "failed");
-            navigate("/course", {
-              state: {
-                quizSummary: {
-                  correct,
-                  total,
-                  passed,
-                  sectionTitle: section.title,
-                },
-              },
-            });
+            setFinalScore({ correct, total, passed });
+            setShowResults(true);
           } else {
             setCurrentIndex((i) => i + 1);
+            setConfirmed(false);
           }
         }}
       >
-        {isLast ? "Submit Quiz" : "Next Question"}
+        {!confirmed ? "Confirm Answer" : isLast ? "See Results" : "Next Question"}
       </button>
     </div>
   );
@@ -1876,6 +2119,8 @@ function QuizPage() {
 // ─── Final Exam Page ──────────────────────────────────────────────────────────
 
 const DEV_BYPASS_FINAL_EXAM = false; // TODO: remove before production
+const EXAM_PASSING_THRESHOLD = 0.8;
+const EXAM_PASSING_PCT = "80%";
 
 function FinalExamPage() {
   const { completed, quizResults, finalExamResult, setFinalExamResult } =
@@ -1886,27 +2131,60 @@ function FinalExamPage() {
   const allQuizzesPassed = ACTIVE_COURSE.sections.every(
     (s) => quizResults[s.id] === "passed",
   );
-  const eligible =
-    DEV_BYPASS_FINAL_EXAM || (allLessonsDone && allQuizzesPassed);
+  const isAdminExamPreview =
+    localStorage.getItem("wci_admin_exam_preview") === "1" &&
+    localStorage.getItem("generatedCertification") !== null;
+  const eligible = DEV_BYPASS_FINAL_EXAM || isAdminExamPreview || (allLessonsDone && allQuizzesPassed);
 
-  const [currentIndex, setCurrentIndex] = useState(0);
+  // ── In-progress persistence ──────────────────────────────────────────────
+  const examProgressKey = user?.id ? `wci_final_exam_progress_${user.id}` : null;
+
+  function loadExamProgress() {
+    if (!examProgressKey) return null;
+    try {
+      const raw = localStorage.getItem(examProgressKey);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  function clearExamProgress() {
+    if (examProgressKey) localStorage.removeItem(examProgressKey);
+  }
+
+  const savedProgress = loadExamProgress();
+  const hasResume = savedProgress?.inProgress === true &&
+    Array.isArray(savedProgress.answers) &&
+    savedProgress.answers.length === ACTIVE_FINAL_EXAM.length;
+
+  const [showIntro, setShowIntro] = useState(!hasResume);
+  const [currentIndex, setCurrentIndex] = useState<number>(
+    hasResume ? (savedProgress.currentIndex ?? 0) : 0,
+  );
   const [answers, setAnswers] = useState<(number | null)[]>(
-    Array(ACTIVE_FINAL_EXAM.length).fill(null),
+    hasResume ? savedProgress.answers : Array(ACTIVE_FINAL_EXAM.length).fill(null),
   );
   const [showResults, setShowResults] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [issuanceError, setIssuanceError] = useState(false);
 
+  // Persist on every answer/index change while exam is in progress
+  useEffect(() => {
+    if (!examProgressKey || showResults || showIntro) return;
+    localStorage.setItem(examProgressKey, JSON.stringify({
+      inProgress: true,
+      currentIndex,
+      answers,
+    }));
+  }, [currentIndex, answers, showIntro, showResults, examProgressKey]);
+
+  // ── Ineligible ──────────────────────────────────────────────────────────
   if (!eligible) {
     return (
       <div className="exam-shell">
-        <Link to="/course" className="page-back-link">
-          ← Back to Course
-        </Link>
-        <div
-          className="info-panel info-panel--notice"
-          style={{ marginTop: "var(--sp-6)" }}
-        >
+        <Link to="/course" className="page-back-link">← Back to Course</Link>
+        <div className="info-panel info-panel--notice" style={{ marginTop: "var(--sp-6)" }}>
           You must complete all lessons and pass all section quizzes before
           taking the final exam.
         </div>
@@ -1914,96 +2192,149 @@ function FinalExamPage() {
     );
   }
 
-  if (finalExamResult === "passed") {
+  // ── Already certified ───────────────────────────────────────────────────
+  if (finalExamResult === "passed" && !showResults) {
     return (
       <div className="exam-shell">
-        <Link to="/course" className="page-back-link">
-          ← Back to Course
-        </Link>
-        <div
-          className="status-bar status-bar--certified"
-          style={{ marginTop: "var(--sp-6)" }}
-        >
-          <span className="status-label" style={{ color: "var(--color-gold)" }}>
-            ✓ Final Exam Passed
-          </span>
-          <Link to="/certificate">View Certificate →</Link>
+        <div className="exam-results-panel" style={{ borderColor: "var(--color-gold)", textAlign: "center" }}>
+          <p style={{ fontSize: "2.5rem", marginBottom: "var(--sp-2)" }}>🏆</p>
+          <p className="results-label" style={{ color: "var(--color-gold)", marginBottom: "var(--sp-2)" }}>
+            Certification Earned
+          </p>
+          <h1 style={{ fontSize: "1.5rem", fontWeight: 700, marginBottom: "var(--sp-3)", color: "var(--navy)" }}>
+            You have passed the Final Certification Exam
+          </h1>
+          <p style={{ fontFamily: "var(--font-ui)", fontSize: "0.875rem", color: "var(--text-muted)", marginBottom: "var(--sp-6)" }}>
+            Your EEO Investigator certification has been issued.
+          </p>
+          <Link to="/certificate" className="btn-primary">View Your Certificate →</Link>
         </div>
       </div>
     );
   }
 
+  // ── Results panel ───────────────────────────────────────────────────────
   if (showResults) {
     const correct = answers.filter(
       (a, i) => a === ACTIVE_FINAL_EXAM[i].correctIndex,
     ).length;
     const total = ACTIVE_FINAL_EXAM.length;
-    const passed = correct / total >= 0.8;
+    const pct = Math.round((correct / total) * 100);
+    const passed = correct / total >= EXAM_PASSING_THRESHOLD;
+
+    if (passed) {
+      return (
+        <div className="exam-shell">
+          <div className="exam-results-panel" style={{ borderColor: "var(--color-gold)", textAlign: "center" }}>
+            <p style={{ fontSize: "2.5rem", marginBottom: "var(--sp-2)" }}>🏆</p>
+            <p className="results-label" style={{ color: "var(--color-gold)", marginBottom: "var(--sp-2)" }}>
+              Certification Earned
+            </p>
+            <h1 style={{ fontSize: "1.5rem", fontWeight: 700, marginBottom: "var(--sp-3)", color: "var(--navy)" }}>
+              You have passed the Final Certification Exam
+            </h1>
+            <p className="results-score" style={{ marginBottom: "var(--sp-1)" }}>{pct}%</p>
+            <p style={{ fontFamily: "var(--font-ui)", fontSize: "0.875rem", color: "var(--text-muted)", marginBottom: "var(--sp-6)" }}>
+              {correct} of {total} questions correct
+            </p>
+            <Link to="/certificate" className="btn-primary">View Your Certificate →</Link>
+          </div>
+        </div>
+      );
+    }
+
+    // Failed
+    const failedSections = ACTIVE_COURSE.sections.filter(
+      (s) => quizResults[s.id] !== "passed"
+    );
 
     return (
       <div className="exam-shell">
-        <h1 className="page-title" style={{ marginBottom: "var(--sp-6)" }}>
-          Final Exam Results
-        </h1>
-        <div className="exam-results-panel">
-          <p className="results-label">Score</p>
-          <p className="results-score">
-            {correct}/{total}
+        <div className="exam-results-panel" style={{ borderColor: "var(--color-error)" }}>
+          <p className="results-label" style={{ color: "var(--color-error)", marginBottom: "var(--sp-2)" }}>
+            Not Passed
           </p>
-          <p
-            style={{
-              fontFamily: "var(--font-ui)",
-              fontWeight: 700,
-              fontSize: "0.8rem",
-              letterSpacing: "0.06em",
-              textTransform: "uppercase",
-              color: passed ? "var(--color-success)" : "var(--color-error)",
-              marginTop: "var(--sp-3)",
-            }}
-          >
-            {passed ? "✓ Final exam passed." : "✗ Final exam failed."}
+          <p className="results-score" style={{ color: "var(--color-error)", marginBottom: "var(--sp-1)" }}>
+            {pct}%
           </p>
+          <p style={{ fontFamily: "var(--font-ui)", fontSize: "0.875rem", color: "var(--text-muted)", marginBottom: "var(--sp-3)" }}>
+            {correct} of {total} correct &mdash; {EXAM_PASSING_PCT} required to pass
+          </p>
+          {failedSections.length > 0 && (
+            <p style={{ fontFamily: "var(--font-ui)", fontSize: "0.875rem", color: "var(--text-secondary)" }}>
+              Consider reviewing:{" "}
+              {failedSections.map((s) => s.title).join(", ")}
+            </p>
+          )}
         </div>
         <div style={{ display: "flex", gap: "var(--sp-4)" }}>
-          {!passed && (
-            <button
-              className="btn-primary"
-              onClick={() => {
-                setAnswers(Array(ACTIVE_FINAL_EXAM.length).fill(null));
-                setCurrentIndex(0);
-                setShowResults(false);
-              }}
-            >
-              Retry Exam
-            </button>
-          )}
-          <Link to="/course" className="btn-secondary">
-            Back to Course
-          </Link>
+          <button
+            className="btn-primary"
+            onClick={() => {
+              clearExamProgress();
+              setAnswers(Array(ACTIVE_FINAL_EXAM.length).fill(null));
+              setCurrentIndex(0);
+              setShowResults(false);
+              setShowIntro(true);
+            }}
+          >
+            Retry Exam
+          </button>
+          <Link to="/course" className="btn-secondary">Back to Course</Link>
         </div>
       </div>
     );
   }
 
+  // ── Intro screen ────────────────────────────────────────────────────────
+  if (showIntro) {
+    return (
+      <div className="exam-shell">
+        <Link to="/course" className="page-back-link">← Back to Course</Link>
+        <div className="exam-results-panel">
+          <p className="results-label" style={{ marginBottom: "var(--sp-3)" }}>
+            EEO Investigator Certification
+          </p>
+          <h1 style={{ fontSize: "1.75rem", fontWeight: 700, color: "var(--navy)", marginBottom: "var(--sp-2)" }}>
+            Final Certification Exam
+          </h1>
+          <p style={{ fontFamily: "var(--font-ui)", fontSize: "0.875rem", color: "var(--text-secondary)", marginBottom: "var(--sp-5)" }}>
+            You've completed the training. This exam validates your readiness.
+          </p>
+          <div style={{ maxWidth: "420px", margin: "0 auto", marginBottom: "var(--sp-4)" }}>
+            <ul style={{ fontFamily: "var(--font-ui)", fontSize: "0.875rem", color: "var(--text-secondary)", lineHeight: 1.8, paddingLeft: "1.2em", textAlign: "left", margin: 0 }}>
+              <li>{ACTIVE_FINAL_EXAM.length} questions covering all sections</li>
+              <li>{EXAM_PASSING_PCT} required to pass</li>
+              <li>Immediate results</li>
+              <li>You may retry if needed</li>
+            </ul>
+          </div>
+          <p style={{ fontFamily: "var(--font-ui)", fontSize: "0.875rem", color: "var(--text-secondary)", marginBottom: "var(--sp-2)" }}>
+            Estimated time: 15–20 minutes
+          </p>
+          <p style={{ fontFamily: "var(--font-ui)", fontSize: "0.8rem", color: "var(--text-muted)", marginBottom: "var(--sp-5)" }}>
+            You are about to be evaluated on your ability to apply EEO law — not just recall it.
+          </p>
+          <button className="btn-primary" onClick={() => setShowIntro(false)} style={{ width: "100%", padding: "var(--sp-4) var(--sp-6)", fontSize: "0.9rem", marginBottom: "var(--sp-2)" }}>
+            Begin Exam
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Question UI ─────────────────────────────────────────────────────────
   const question = ACTIVE_FINAL_EXAM[currentIndex];
   const selected = answers[currentIndex];
   const isLast = currentIndex === ACTIVE_FINAL_EXAM.length - 1;
-  const progressPct = Math.round(
-    (currentIndex / ACTIVE_FINAL_EXAM.length) * 100,
-  );
+  const progressPct = Math.round((currentIndex / ACTIVE_FINAL_EXAM.length) * 100);
 
   return (
     <div className="exam-shell">
-      <Link to="/course" className="page-back-link">
-        ← Back to Course
-      </Link>
-      <h1 className="quiz-heading">Final Exam</h1>
+      <p className="quiz-context">Final Certification Exam</p>
 
       <div className="quiz-progress">
-        <div
-          className="quiz-progress__fill"
-          style={{ width: `${progressPct}%` }}
-        />
+        <div className="quiz-progress__fill" style={{ width: `${progressPct}%` }} />
       </div>
 
       <p className="quiz-counter">
@@ -2039,9 +2370,10 @@ function FinalExamPage() {
             const correct = answers.filter(
               (a, i) => a === ACTIVE_FINAL_EXAM[i].correctIndex,
             ).length;
-            const passed = correct / ACTIVE_FINAL_EXAM.length >= 0.8;
+            const passed = correct / ACTIVE_FINAL_EXAM.length >= EXAM_PASSING_THRESHOLD;
 
             if (!passed) {
+              clearExamProgress();
               setFinalExamResult("failed");
               setShowResults(true);
               return;
@@ -2053,8 +2385,7 @@ function FinalExamPage() {
             try {
               const uid = user?.id;
               const fullName =
-                (uid ? localStorage.getItem(`wci_cert_name_${uid}`) : null) ??
-                "";
+                (uid ? localStorage.getItem(`wci_cert_name_${uid}`) : null) ?? "";
               const token = await getToken();
               const base = import.meta.env.VITE_API_URL ?? "";
               const res = await fetch(`${base}/complete-exam`, {
@@ -2066,7 +2397,7 @@ function FinalExamPage() {
                 body: JSON.stringify({ fullName }),
               });
               if (!res.ok) throw new Error(`${res.status}`);
-              // Server confirmed — now mark locally and show results.
+              clearExamProgress();
               setFinalExamResult("passed");
               setShowResults(true);
             } catch {
@@ -2081,15 +2412,9 @@ function FinalExamPage() {
       >
         {isSubmitting ? "Saving…" : isLast ? "Submit Exam" : "Next Question"}
       </button>
+
       {issuanceError && (
-        <p
-          style={{
-            fontFamily: "var(--font-ui)",
-            fontSize: "0.875rem",
-            color: "var(--color-error)",
-            marginTop: "var(--sp-4)",
-          }}
-        >
+        <p style={{ fontFamily: "var(--font-ui)", fontSize: "0.875rem", color: "var(--color-error)", marginTop: "var(--sp-4)" }}>
           Something went wrong saving your result. Please try submitting again.
         </p>
       )}
@@ -2867,6 +3192,13 @@ function CourseAccessGuard({ children }: { children: React.ReactNode }) {
   const { courseAccessActive, paidLoading } = useCompletion();
   const { isLoaded: clerkLoaded, isSignedIn } = useUser();
   if (DEV_BYPASS_PAID_GUARD) return <>{children}</>;
+  // Temp admin preview bypass — active only when both the preview flag and a
+  // generated certification payload are present in localStorage.  Does not grant
+  // server-side access; bypasses only this frontend route guard.
+  const isAdminPreview =
+    localStorage.getItem("wci_admin_preview") === "1" &&
+    localStorage.getItem("generatedCertification") !== null;
+  if (isAdminPreview) return <>{children}</>;
   if (!clerkLoaded || !isSignedIn || paidLoading) return null;
   if (!courseAccessActive) return <Navigate to="/" replace />;
   return <>{children}</>;

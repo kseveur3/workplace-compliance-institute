@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useUser, useClerk } from '@clerk/clerk-react'
+import type { CertResult } from '../types/certification'
 
 const ADMIN_EMAIL = 'kseveur@gmail.com'
 
@@ -36,15 +37,7 @@ const MUTED: React.CSSProperties = {
 }
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-
-interface CertResult {
-  sourceSummary: string
-  curriculumOutline: { section: string; lessons: number }[]
-  lessons: { section: string; lessons: { title: string; estimatedTime: string; content: string[] }[] }[]
-  examples: { title: string; scenario: string }[]
-  sectionQuizzes: { section: string; questions: { question: string; options: string[]; correctIndex: number }[] }[]
-  finalExam: { totalQuestions: number; passingScore: string; coverage: string[] }
-}
+// CertResult is imported from src/types/certification.ts
 
 interface CeuResult {
   detectedChanges: string[]
@@ -72,10 +65,14 @@ export function AdminAiContentPage() {
   const primaryEmail = user?.primaryEmailAddress?.emailAddress
 
   const [certLoading, setCertLoading] = useState(false)
+  const [certContentLoading, setCertContentLoading] = useState(false)
   const [certResult, setCertResult] = useState<CertResult | null>(null)
   const [certError, setCertError] = useState<string | null>(null)
   const [certCopied, setCertCopied] = useState(false)
   const [certLoaded, setCertLoaded] = useState(false)
+  const [certTimestamp, setCertTimestamp] = useState<Date | null>(null)
+  const [certDurationMs, setCertDurationMs] = useState<number | null>(null)
+  const [certGenType, setCertGenType] = useState<'Skeleton' | 'Full Content' | null>(null)
 
   const [ceuLoading, setCeuLoading] = useState(false)
   const [ceuResult, setCeuResult] = useState<CeuResult | null>(null)
@@ -91,9 +88,13 @@ export function AdminAiContentPage() {
     setCertLoading(true)
     setCertResult(null)
     setCertError(null)
+    setCertTimestamp(null)
+    setCertDurationMs(null)
+    setCertGenType(null)
+    const t0 = Date.now()
     try {
       console.log('BEFORE fetch')
-      const res = await fetch('/api/admin/generate-certification', { method: 'POST' })
+      const res = await fetch('/api/admin/generate-certification-eeoc-skeleton', { method: 'POST' })
       console.log('AFTER fetch')
       console.log('status', res.status)
       console.log('headers', Object.fromEntries(res.headers.entries()))
@@ -106,11 +107,41 @@ export function AdminAiContentPage() {
         setCertError(data.error ?? 'Request failed.')
       } else {
         setCertResult(data)
+        setCertTimestamp(new Date())
+        setCertDurationMs(Date.now() - t0)
+        setCertGenType('Skeleton')
       }
     } catch (err: any) {
       setCertError(err.message ?? 'Unexpected error.')
     } finally {
       setCertLoading(false)
+    }
+  }
+
+  async function handleGenerateCertificationContent() {
+    setCertContentLoading(true)
+    setCertResult(null)
+    setCertError(null)
+    setCertTimestamp(null)
+    setCertDurationMs(null)
+    setCertGenType(null)
+    const t0 = Date.now()
+    try {
+      const res = await fetch('/api/admin/generate-certification-eeoc-content', { method: 'POST' })
+      const text = await res.text()
+      const data = JSON.parse(text)
+      if (!res.ok) {
+        setCertError(data.error ?? 'Request failed.')
+      } else {
+        setCertResult(data)
+        setCertTimestamp(new Date())
+        setCertDurationMs(Date.now() - t0)
+        setCertGenType('Full Content')
+      }
+    } catch (err: any) {
+      setCertError(err.message ?? 'Unexpected error.')
+    } finally {
+      setCertContentLoading(false)
     }
   }
 
@@ -136,7 +167,7 @@ export function AdminAiContentPage() {
   const certErr = (msg: string) => <p style={{ ...MUTED, color: 'var(--color-error)' }}>{msg}</p>
 
   return (
-    <div style={{ maxWidth: 800, margin: '0 auto', padding: 'var(--sp-10) var(--sp-6)' }}>
+    <div style={{ maxWidth: 1120, margin: '0 auto', padding: 'var(--sp-10) var(--sp-6)' }}>
 
       {/* Top bar */}
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 'var(--sp-4)' }}>
@@ -158,11 +189,90 @@ export function AdminAiContentPage() {
           lessons, real-world examples, section quizzes, and a final exam — ready for admin review before publishing.
         </p>
 
-        <div style={{ marginBottom: 'var(--sp-8)' }}>
-          <button className="btn-primary" type="button" onClick={handleGenerateCertification} disabled={certLoading}>
-            {certLoading ? 'Generating...' : 'Generate Full Certification'}
-          </button>
+        {/* Outer wrapper: centers the whole action block */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 'var(--sp-8)' }}>
+          {/* Row 1: buttons side-by-side */}
+          <div style={{ display: 'flex', gap: 'var(--sp-4)', flexWrap: 'wrap', justifyContent: 'center' }}>
+            <button
+              className="btn-primary"
+              type="button"
+              onClick={handleGenerateCertification}
+              disabled={certLoading || certContentLoading}
+              style={{ opacity: certContentLoading ? 0.3 : 1, transition: 'opacity 0.2s' }}
+            >
+              {certLoading ? 'Generating...' : 'Generate Full Certification'}
+            </button>
+            <button
+              className="btn-secondary"
+              type="button"
+              onClick={handleGenerateCertificationContent}
+              disabled={certLoading || certContentLoading}
+            >
+              {certContentLoading
+                ? 'Generating Full Certification Content...'
+                : 'Generate Full Certification Content (Temp)'}
+            </button>
+          </div>
+          {/* Row 2: loading indicator centered under buttons, space always reserved */}
+          <div style={{
+            marginTop: 'var(--sp-4)',
+            minHeight: '3.5rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            visibility: certContentLoading ? 'visible' : 'hidden',
+          }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--sp-3)',
+              background: 'var(--teal-50)',
+              border: '1px solid var(--teal-100)',
+              borderRadius: 'var(--r-lg)',
+              padding: 'var(--sp-3) var(--sp-5)',
+            }}>
+              <span className="spinner spinner--lg" aria-hidden="true" />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                <span style={{ fontFamily: 'var(--font-ui)', fontSize: '0.95rem', fontWeight: 700, color: 'var(--navy)' }}>
+                  Generating certification content...
+                </span>
+                <span style={{ fontFamily: 'var(--font-ui)', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                  This can take about a minute.
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
+
+        {certResult && certTimestamp && (() => {
+          const sectionCount = certResult.curriculumOutline.length
+          const lessonCount  = certResult.lessons.reduce((n, s) => n + s.lessons.length, 0)
+          const timeStr      = certTimestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          const durationStr  = certDurationMs !== null
+            ? certDurationMs < 60_000
+              ? `${(certDurationMs / 1000).toFixed(1)}s`
+              : `${Math.round(certDurationMs / 1000)}s`
+            : null
+          return (
+            <div style={{
+              display: 'flex', gap: 'var(--sp-6)', flexWrap: 'wrap', alignItems: 'center',
+              background: 'var(--teal-50)', border: '1px solid var(--teal-100)',
+              borderRadius: 'var(--r-lg)', padding: 'var(--sp-3) var(--sp-5)',
+              marginBottom: 'var(--sp-6)',
+              fontFamily: 'var(--font-ui)', fontSize: '0.82rem', color: 'var(--text-secondary)',
+            }}>
+              <span style={{ fontWeight: 700, color: 'var(--teal)', fontSize: '0.78rem', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                ✓ Generated
+              </span>
+              <span><strong style={{ color: 'var(--navy)' }}>{sectionCount}</strong> sections</span>
+              <span><strong style={{ color: 'var(--navy)' }}>{lessonCount}</strong> lessons</span>
+              <span>Source: <strong style={{ color: 'var(--navy)' }}>EEOC</strong></span>
+              {certGenType && <span>Type: <strong style={{ color: 'var(--navy)' }}>{certGenType}</strong></span>}
+              <span>At <strong style={{ color: 'var(--navy)' }}>{timeStr}</strong></span>
+              {durationStr && <span>Took <strong style={{ color: 'var(--navy)' }}>{durationStr}</strong></span>}
+            </div>
+          )
+        })()}
 
         {certResult && (
           <div style={{ marginBottom: 'var(--sp-8)' }}>
@@ -191,6 +301,31 @@ export function AdminAiContentPage() {
               Load Certification (Temp)
             </button>
             {certLoaded && <p style={{ ...MUTED, marginTop: 'var(--sp-2)' }}>Certification loaded locally</p>}
+            <button
+              className="btn-secondary"
+              type="button"
+              style={{ marginTop: 'var(--sp-3)' }}
+              onClick={() => {
+                localStorage.setItem('generatedCertification', JSON.stringify(certResult))
+                localStorage.setItem('wci_admin_preview', '1')
+                window.open('/course', '_blank', 'noopener,noreferrer')
+              }}
+            >
+              Preview as User ↗
+            </button>
+            <button
+              className="btn-secondary"
+              type="button"
+              style={{ marginTop: 'var(--sp-2)' }}
+              onClick={() => {
+                localStorage.setItem('generatedCertification', JSON.stringify(certResult))
+                localStorage.setItem('wci_admin_preview', '1')
+                localStorage.setItem('wci_admin_exam_preview', '1')
+                window.open('/final-exam', '_blank', 'noopener,noreferrer')
+              }}
+            >
+              Preview Final Exam ↗
+            </button>
           </div>
         )}
 

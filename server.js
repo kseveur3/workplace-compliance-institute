@@ -622,9 +622,58 @@ app.get("/my-exams", clerkMiddleware(), async (req, res) => {
   }
 });
 
-// ── Admin: Generate full certification (mock) ────────────────────────────────
-app.post("/api/admin/generate-certification", async (req, res) => {
-  res.json({
+// ── Admin: Seed data for structured certification builder ────────────────────
+import { EEO_CERT_SEED } from "./data/eeo-cert-seed.js";
+import { fetchEeocLawsPage, fetchEeocLawsPageText, fetchEeocLawSections, analyzeEeocStructure } from "./services/eeoc-source.js";
+import { buildEeocLessonMap } from "./services/eeoc-lesson-map.js";
+import { buildEeocCurriculumSkeleton } from "./services/eeoc-curriculum-skeleton.js";
+import { buildEeocTimePlan } from "./services/eeoc-time-plan.js";
+import { buildEeocLessonSplit } from "./services/eeoc-lesson-split.js";
+import { buildEeocNormalizedOutline } from "./services/eeoc-normalize-titles.js";
+import { buildEeocCertificationSkeleton } from "./services/eeoc-certification-builder.js";
+import { generateLessonContent }        from "./services/generate-lesson-content.js";
+import { generateCertificationContent } from "./services/generate-certification-content.js";
+
+
+// ── Admin: Structured certification builder ───────────────────────────────────
+// Assembles the response payload from EEO_CERT_SEED.
+// Swap the seed data (or replace this function body) to change content without
+// touching the payload contract the frontend expects.
+function buildCertificationFromSeedData() {
+  const { sourceSummary, passingScore, sections, examples, finalExamQuestions } = EEO_CERT_SEED;
+
+  // Derive the short label ("Section 1") from the full title ("Section 1: ...")
+  const shortLabel = (title) => title.split(":")[0].trim();
+
+  return {
+    sourceSummary,
+    curriculumOutline: sections.map((s) => ({
+      section: s.title,
+      lessons: s.lessons.length,
+    })),
+    lessons: sections.map((s) => ({
+      section: shortLabel(s.title),
+      lessons: s.lessons,
+    })),
+    examples,
+    sectionQuizzes: sections.map((s) => ({
+      section: shortLabel(s.title),
+      questions: s.quizQuestions,
+    })),
+    finalExam: {
+      totalQuestions: finalExamQuestions.length,
+      passingScore,
+      coverage: sections.map((s) => s.coverageDescription),
+      questions: finalExamQuestions,
+    },
+  };
+}
+
+// ── Admin: Static certification payload ──────────────────────────────────────
+// Returns the hardcoded EEO certification content used by the frontend pipeline.
+// This function will be replaced with AI-generated content in Phase 2.
+function buildStaticCertificationPayload() {
+  return {
     sourceSummary:
       "Source material drawn from EEOC-enforced federal statutes: Title VII of the Civil Rights Act (1964), the Age Discrimination in Employment Act (ADEA), the Americans with Disabilities Act (ADA), the Pregnancy Discrimination Act (PDA), and the Pregnant Workers Fairness Act (PWFA). Topics include harassment, discrimination, retaliation, accommodation obligations, and complaint procedures.",
     curriculumOutline: [
@@ -693,7 +742,7 @@ app.post("/api/admin/generate-certification", async (req, res) => {
             title: "Bystander Responsibility",
             estimatedTime: "10 minutes",
             content: [
-              "Bystanders — coworkers who witness harassment — play an important role in preventing and addressing misconduct. Inaction can contribute to a culture that tolerates harassment.",
+              "Bystanders — coworkers who witness harassment — play an important role in preventing and addressing misconduct. Inaction can contribute to a culture that tolerat es harassment.",
               "Employees who witness harassment can intervene safely, document what they observed, or report the conduct to HR or a manager even if the target does not come forward.",
               "Organizations with active bystander training programs have lower rates of sustained harassment complaints and faster resolution times.",
             ],
@@ -935,7 +984,61 @@ app.post("/api/admin/generate-certification", async (req, res) => {
         { question: "Which of the following best describes disparate treatment?", options: ["A neutral policy that screens out a protected group", "Intentionally treating an employee less favorably because of a protected characteristic", "Failure to provide a reasonable accommodation", "Conduct that creates a hostile work environment"], correctIndex: 1 },
       ],
     },
-  });
+  };
+}
+
+// ── Admin: Generate full certification (mock) ────────────────────────────────
+app.post("/api/admin/generate-certification", async (_req, res) => {
+  res.json(buildCertificationFromSeedData());
+});
+
+// ── Admin: Generate EEOC-skeleton certification ───────────────────────────────
+// Temporary route — identical payload contract to /generate-certification but
+// built entirely from the deterministic EEOC pipeline (no AI, no seed data).
+// Content arrays are [SKELETON] placeholders; quiz/example fields are empty.
+// Remove or swap this route for the AI-generation path when prose is ready.
+app.post("/api/admin/generate-certification-eeoc-skeleton", async (_req, res) => {
+  try {
+    const payload = await buildEeocCertificationSkeleton();
+    res.json(payload);
+  } catch (err) {
+    res.status(502).json({ error: err.message });
+  }
+});
+
+// ── Admin: Generate AI content for full EEOC certification ───────────────────
+// Temporary route — builds the deterministic skeleton, then generates AI prose
+// for every lesson in parallel (25 lessons, 4 sections).
+// Quizzes, examples, and finalExam.questions are left empty (prose phase only).
+// Identical payload shape to /generate-certification-eeoc-skeleton.
+app.post("/api/admin/generate-certification-eeoc-content", async (_req, res) => {
+  try {
+    const payload = await generateCertificationContent();
+    res.json(payload);
+  } catch (err) {
+    res.status(502).json({ error: err.message });
+  }
+});
+
+// ── Admin: Generate AI content for a single lesson ───────────────────────────
+// Temporary route — takes one lesson object (including _source metadata) from
+// the EEOC skeleton payload and returns the same object with content[] replaced
+// by AI-generated instructional prose grounded in the listed statutes.
+// Does not touch quizzes, examples, or the rest of the certification payload.
+app.post("/api/admin/generate-single-lesson-content", async (req, res) => {
+  const lesson = req.body;
+  if (!lesson || typeof lesson !== "object" || !lesson.title) {
+    return res.status(400).json({ error: "Request body must be a lesson object with a title field." });
+  }
+  if (!lesson._source?.sourceLaws) {
+    return res.status(400).json({ error: "Lesson object must include a _source.sourceLaws array." });
+  }
+  try {
+    const filled = await generateLessonContent(lesson);
+    res.json(filled);
+  } catch (err) {
+    res.status(502).json({ error: err.message });
+  }
 });
 
 // ── Admin: Scan EEOC updates for CEU (mock) ──────────────────────────────────
@@ -967,6 +1070,188 @@ app.post("/api/admin/scan-ceu-updates", async (req, res) => {
       },
     ],
   });
+});
+
+// ── Admin: EEOC source fetch test ────────────────────────────────────────────
+// Temporary diagnostic route — calls fetchEeocLawsPage() and returns a preview.
+// Remove or gate behind auth before going to production.
+app.get("/api/admin/eeoc-source-test", async (_req, res) => {
+  try {
+    const { url, fetchedAt, html } = await fetchEeocLawsPage();
+    res.json({
+      url,
+      fetchedAt,
+      htmlLength: html.length,
+      preview: html.slice(0, 800),
+    });
+  } catch (err) {
+    res.status(502).json({ error: err.message });
+  }
+});
+
+// ── Admin: EEOC source text extraction test ───────────────────────────────────
+// Temporary diagnostic route. Remove or gate behind auth before production.
+app.get("/api/admin/eeoc-source-text-test", async (_req, res) => {
+  try {
+    const { url, fetchedAt, text, textLength } = await fetchEeocLawsPageText();
+    res.json({
+      url,
+      fetchedAt,
+      textLength,
+      preview: text.slice(0, 1000),
+    });
+  } catch (err) {
+    res.status(502).json({ error: err.message });
+  }
+});
+
+// ── Admin: EEOC law sections parser test ─────────────────────────────────────
+// Temporary diagnostic route. Remove or gate behind auth before production.
+app.get("/api/admin/eeoc-law-sections-test", async (_req, res) => {
+  try {
+    const { url, fetchedAt, sections, _debug } = await fetchEeocLawSections();
+    res.json({
+      url,
+      fetchedAt,
+      sectionCount: sections.length,
+      // Confirmation flags
+      pdaPresent: _debug.pdaPresent,
+      civilRightsAct1991Present: _debug.civilRightsAct1991Present,
+      notFound: _debug.notFound,
+      // Per-law alias definitions used for detection
+      lawDefinitions: _debug.lawDefinitions,
+      // Start index where each heading was detected in the cleaned text
+      detectedHeadings: _debug.detectedHeadings,
+      // Section titles and body previews
+      sections: sections.map(({ title, body }) => ({
+        title,
+        bodyPreview: body.slice(0, 300),
+        bodyLength: body.length,
+      })),
+    });
+  } catch (err) {
+    res.status(502).json({ error: err.message });
+  }
+});
+
+// ── Admin: EEOC page structure analysis ──────────────────────────────────────
+// Temporary diagnostic route. Remove or gate behind auth before production.
+// Returns a law-by-law outline: subheadings and paragraph openers extracted
+// from the cleaned page text. Use this to decide how many course modules each
+// law warrants and which compliance topics should become category labels.
+app.get("/api/admin/eeoc-structure-test", async (_req, res) => {
+  try {
+    const { url, fetchedAt, lawCount, notFound, outline } =
+      await analyzeEeocStructure();
+    res.json({
+      url,
+      fetchedAt,
+      lawCount,
+      notFound,
+      // Shape of each outline entry:
+      //   law            – canonical law title
+      //   bodyLength     – raw char count of cleaned section body
+      //   subheadings    – short heading-like lines (≤ 10 words, ≤ 70 chars,
+      //                    no trailing period) — indicate in-section topics
+      //   paragraphCount – number of substantive text blocks detected
+      //   paragraphOpeners – first ~160 chars of each text block — show scope,
+      //                      coverage language, and prohibited conduct language
+      outline,
+    });
+  } catch (err) {
+    res.status(502).json({ error: err.message });
+  }
+});
+
+// ── Admin: EEOC lesson map ────────────────────────────────────────────────────
+// Temporary diagnostic route. Remove or gate behind auth before production.
+// Returns the taxonomy-driven lesson map: four course sections, twelve lessons,
+// each enriched with sourceLaws, sourceSubheadings, and paragraphCount derived
+// from the live EEOC page.  Fully deterministic — no AI.
+app.get("/api/admin/eeoc-lesson-map-test", async (_req, res) => {
+  try {
+    const {
+      url,
+      fetchedAt,
+      lawCount,
+      notFound,
+      totalLessonCount,
+      courseSections,
+    } = await buildEeocLessonMap();
+    res.json({
+      url,
+      fetchedAt,
+      lawCount,
+      notFound,
+      totalLessonCount,
+      // Shape of each courseSections entry:
+      //   sectionTitle   – learner-facing module group name
+      //   lessonTopics[] – lessons within this section, each with:
+      //     title              – lesson name
+      //     sourceLaws[]       – canonical law titles that contribute content
+      //     sourceSubheadings[]– subheadings matched from those law sections
+      //     paragraphCount     – total paragraph blocks across source laws
+      courseSections,
+    });
+  } catch (err) {
+    res.status(502).json({ error: err.message });
+  }
+});
+
+// ── Admin: EEOC curriculum skeleton ──────────────────────────────────────────
+// Temporary diagnostic route. Remove or gate behind auth before production.
+//
+// Returns a certification-shaped payload built entirely from the deterministic
+// lesson map.  Shape is identical to buildStaticCertificationPayload() so the
+// frontend can render it without changes.  Content arrays are [SKELETON]
+// placeholders; examples/quiz/finalExam questions are empty arrays pending
+// the prose-generation phase.
+app.get("/api/admin/eeoc-curriculum-skeleton-test", async (_req, res) => {
+  try {
+    const payload = await buildEeocCurriculumSkeleton();
+    res.json(payload);
+  } catch (err) {
+    res.status(502).json({ error: err.message });
+  }
+});
+
+// ── Admin: EEOC 40-hour time-allocation plan ──────────────────────────────────
+// Temporary diagnostic route. Remove or gate behind auth before production.
+// Proportionally distributes 2 400 minutes across the 13-lesson skeleton using
+// a deterministic weight formula.  No AI, no prose.
+app.get("/api/admin/eeoc-time-plan-test", async (_req, res) => {
+  try {
+    const plan = await buildEeocTimePlan();
+    res.json(plan);
+  } catch (err) {
+    res.status(502).json({ error: err.message });
+  }
+});
+
+// ── Admin: EEOC lesson-split planner ─────────────────────────────────────────
+// Temporary diagnostic route. Remove or gate behind auth before production.
+// Identifies lessons over 120 min and splits them deterministically by
+// subheadings → laws → generic parts.  Total program time is preserved.
+app.get("/api/admin/eeoc-lesson-split-test", async (_req, res) => {
+  try {
+    const plan = await buildEeocLessonSplit();
+    res.json(plan);
+  } catch (err) {
+    res.status(502).json({ error: err.message });
+  }
+});
+
+// ── Admin: EEOC normalized curriculum outline ─────────────────────────────────
+// Temporary diagnostic route. Remove or gate behind auth before production.
+// Applies the title-normalization layer on top of the split lesson plan and
+// returns the final learner-facing section and lesson titles.
+app.get("/api/admin/eeoc-normalized-outline-test", async (_req, res) => {
+  try {
+    const outline = await buildEeocNormalizedOutline();
+    res.json(outline);
+  } catch (err) {
+    res.status(502).json({ error: err.message });
+  }
 });
 
 // ── Public certificate verification ──────────────────────────────────────────
