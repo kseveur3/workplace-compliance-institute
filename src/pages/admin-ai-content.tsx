@@ -45,6 +45,16 @@ interface CeuResult {
   ceuQuiz: { question: string; correctAnswer: string }[]
 }
 
+interface CeuContentResult {
+  modules: {
+    id: string
+    title: string
+    summary: string
+    questions: { question: string; options: string[]; correctIndex: number }[]
+  }[]
+  finalExam: { question: string; options: string[]; correctIndex: number }[]
+}
+
 // ── Output Panel ─────────────────────────────────────────────────────────────
 
 function OutputPanel({ label, children }: { label: string; children?: React.ReactNode }) {
@@ -78,13 +88,17 @@ export function AdminAiContentPage() {
   const [ceuResult, setCeuResult] = useState<CeuResult | null>(null)
   const [ceuError, setCeuError] = useState<string | null>(null)
 
+  const [ceuContentLoading, setCeuContentLoading] = useState(false)
+  const [ceuContentResult, setCeuContentResult] = useState<CeuContentResult | null>(null)
+  const [ceuContentError, setCeuContentError] = useState<string | null>(null)
+  const [ceuContentLoaded, setCeuContentLoaded] = useState(false)
+
   if (!isLoaded) return <p>Loading...</p>
   if (primaryEmail !== ADMIN_EMAIL) {
     return <p>Access denied. Set ADMIN_EMAIL in admin-ai-content.tsx.</p>
   }
 
   async function handleGenerateCertification() {
-    console.log('CLICKED generate')
     setCertLoading(true)
     setCertResult(null)
     setCertError(null)
@@ -93,16 +107,9 @@ export function AdminAiContentPage() {
     setCertGenType(null)
     const t0 = Date.now()
     try {
-      console.log('BEFORE fetch')
       const res = await fetch('/api/admin/generate-certification-eeoc-skeleton', { method: 'POST' })
-      console.log('AFTER fetch')
-      console.log('status', res.status)
-      console.log('headers', Object.fromEntries(res.headers.entries()))
       const text = await res.text()
-      console.log('AFTER text')
-      console.log('raw response', text)
       const data = JSON.parse(text)
-      console.log('AFTER parse')
       if (!res.ok) {
         setCertError(data.error ?? 'Request failed.')
       } else {
@@ -142,6 +149,25 @@ export function AdminAiContentPage() {
       setCertError(err.message ?? 'Unexpected error.')
     } finally {
       setCertContentLoading(false)
+    }
+  }
+
+  async function handleGenerateCeuContent() {
+    setCeuContentLoading(true)
+    setCeuContentResult(null)
+    setCeuContentError(null)
+    try {
+      const res = await fetch('/api/admin/generate-ceu-content', { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok) {
+        setCeuContentError(data.error ?? 'Request failed.')
+      } else {
+        setCeuContentResult(data)
+      }
+    } catch (err: any) {
+      setCeuContentError(err.message ?? 'Unexpected error.')
+    } finally {
+      setCeuContentLoading(false)
     }
   }
 
@@ -471,6 +497,156 @@ export function AdminAiContentPage() {
           </OutputPanel>
 
         </div>
+
+        {/* ── CEU Assessment Generator ── */}
+        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 'var(--sp-8)', marginTop: 'var(--sp-10)' }}>
+          <h3 style={{ fontFamily: 'var(--font-display)', color: 'var(--text-h)', fontSize: '1.15rem', marginBottom: 'var(--sp-2)' }}>
+            CEU Assessment Generator
+          </h3>
+          <p style={{ fontFamily: 'var(--font-ui)', color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: 'var(--sp-6)' }}>
+            Generates a full CEU renewal assessment: 4 modules with questions and a 20-question final exam,
+            grounded in federal EEO law. Load into localStorage to preview at <code>/ceu</code>.
+          </p>
+
+          <div style={{ display: 'flex', gap: 'var(--sp-3)', flexWrap: 'wrap', marginBottom: 'var(--sp-6)' }}>
+            <button
+              className="btn-primary"
+              type="button"
+              onClick={handleGenerateCeuContent}
+              disabled={ceuContentLoading}
+            >
+              {ceuContentLoading ? 'Generating...' : 'Generate CEU Content'}
+            </button>
+            <button
+              className="btn-secondary"
+              type="button"
+              onClick={() => {
+                localStorage.removeItem('generatedCeuContent')
+                setCeuContentLoaded(false)
+              }}
+            >
+              Clear localStorage
+            </button>
+          </div>
+
+          {ceuContentError && (
+            <p style={{ ...MUTED, color: 'var(--color-error)', marginBottom: 'var(--sp-4)' }}>{ceuContentError}</p>
+          )}
+
+          {ceuContentResult && (() => {
+            const moduleCount = Array.isArray(ceuContentResult.modules) ? ceuContentResult.modules.length : 0
+            const finalExamCount = Array.isArray(ceuContentResult.finalExam) ? ceuContentResult.finalExam.length : 0
+            const allModulesHaveQuestions = ceuContentResult.modules?.every(
+              (m) => Array.isArray(m.questions) && m.questions.length > 0
+            ) ?? false
+            const isValid = moduleCount > 0 && finalExamCount > 0 && allModulesHaveQuestions
+
+            return (
+              <>
+                {!isValid && (
+                  <p style={{ ...MUTED, color: 'var(--color-error)', marginBottom: 'var(--sp-4)' }}>
+                    Generated content is incomplete or malformed — cannot load. Try regenerating.
+                  </p>
+                )}
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-4)', marginBottom: 'var(--sp-6)', flexWrap: 'wrap' }}>
+                  <button
+                    className="btn-secondary"
+                    type="button"
+                    disabled={!isValid}
+                    onClick={() => {
+                      localStorage.setItem('generatedCeuContent', JSON.stringify(ceuContentResult))
+                      setCeuContentLoaded(true)
+                      setTimeout(() => setCeuContentLoaded(false), 2500)
+                    }}
+                  >
+                    Load to localStorage
+                  </button>
+                  {ceuContentLoaded && (
+                    <p style={{ ...MUTED, margin: 0 }}>Loaded — refresh /ceu to preview</p>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-5)' }}>
+                  <OutputPanel label={`Modules (${moduleCount})`}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-6)' }}>
+                      {ceuContentResult.modules?.map((mod, i) => {
+                        const qCount = Array.isArray(mod.questions) ? mod.questions.length : 0
+                        const sampleQs = (mod.questions ?? []).slice(0, 2)
+                        return (
+                          <div key={mod.id ?? i}>
+                            <p style={{ ...BODY, fontWeight: 600, marginBottom: 'var(--sp-1)' }}>
+                              {i + 1}. {mod.title ?? '(no title)'}
+                            </p>
+                            {mod.summary && (
+                              <p style={{ ...BODY, color: 'var(--text-secondary)', marginBottom: 'var(--sp-2)' }}>
+                                {mod.summary}
+                              </p>
+                            )}
+                            <p style={{ ...MUTED, color: qCount === 0 ? 'var(--color-error)' : undefined, marginBottom: sampleQs.length > 0 ? 'var(--sp-3)' : 0 }}>
+                              {qCount} question{qCount !== 1 ? 's' : ''}{qCount === 0 ? ' ⚠ missing' : ''}
+                            </p>
+                            {sampleQs.map((q, qi) => (
+                              <div key={qi} style={{ borderLeft: '2px solid var(--border)', paddingLeft: 'var(--sp-4)', marginBottom: 'var(--sp-3)' }}>
+                                <p style={{ ...BODY, fontSize: '0.85rem', fontWeight: 600, marginBottom: 'var(--sp-1)' }}>
+                                  Q{qi + 1}. {q.question}
+                                </p>
+                                <ul style={{ margin: 0, paddingLeft: 'var(--sp-4)', listStyle: 'none' }}>
+                                  {q.options.map((opt: string, oi: number) => (
+                                    <li key={oi} style={{
+                                      fontFamily: 'var(--font-ui)',
+                                      fontSize: '0.8rem',
+                                      color: oi === q.correctIndex ? 'var(--color-success)' : 'var(--text-secondary)',
+                                      fontWeight: oi === q.correctIndex ? 600 : 400,
+                                      marginBottom: '2px',
+                                    }}>
+                                      {oi === q.correctIndex ? '✓ ' : '○ '}{opt}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            ))}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </OutputPanel>
+
+                  <OutputPanel label={`Final Exam (${finalExamCount} questions)`}>
+                    {finalExamCount === 0 ? (
+                      <p style={{ ...BODY, color: 'var(--color-error)' }}>⚠ missing</p>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-3)' }}>
+                        <p style={MUTED}>{finalExamCount} question{finalExamCount !== 1 ? 's' : ''} — showing first 3</p>
+                        {(ceuContentResult.finalExam ?? []).slice(0, 3).map((q, qi) => (
+                          <div key={qi} style={{ borderLeft: '2px solid var(--border)', paddingLeft: 'var(--sp-4)' }}>
+                            <p style={{ ...BODY, fontSize: '0.85rem', fontWeight: 600, marginBottom: 'var(--sp-1)' }}>
+                              Q{qi + 1}. {q.question}
+                            </p>
+                            <ul style={{ margin: 0, paddingLeft: 'var(--sp-4)', listStyle: 'none' }}>
+                              {q.options.map((opt: string, oi: number) => (
+                                <li key={oi} style={{
+                                  fontFamily: 'var(--font-ui)',
+                                  fontSize: '0.8rem',
+                                  color: oi === q.correctIndex ? 'var(--color-success)' : 'var(--text-secondary)',
+                                  fontWeight: oi === q.correctIndex ? 600 : 400,
+                                  marginBottom: '2px',
+                                }}>
+                                  {oi === q.correctIndex ? '✓ ' : '○ '}{opt}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </OutputPanel>
+                </div>
+              </>
+            )
+          })()}
+        </div>
+
       </section>
 
     </div>
