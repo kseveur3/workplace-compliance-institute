@@ -78,6 +78,7 @@ model UserCertification {
   expiresAt   DateTime
   renewedAt   DateTime?
   ceuPaidAt   DateTime?
+  isCeuOnly   Boolean   @default(false) // true for external CEU-only users who never earned the full certification
 
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt

@@ -21,7 +21,16 @@ const pool = new pg.Pool({
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
-app.use(cors({ origin: ["http://localhost:5173", "http://localhost:5174"] }));
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow any localhost port in development; in production CLIENT_URL is set
+    if (!origin || /^http:\/\/localhost:\d+$/.test(origin) || origin === process.env.CLIENT_URL) {
+      callback(null, true);
+    } else {
+      callback(new Error(`CORS: origin ${origin} not allowed`));
+    }
+  },
+}));
 
 // ── Exam config ───────────────────────────────────────────────────────────────
 const EEO_EXAM = {
@@ -79,20 +88,22 @@ app.post(
         const { certId, examId } = session.metadata;
 
         if (examId) {
-          // ── New-style session: route by UserCertification existence ──────────
-          // Internal users (passed main exam) have a UserCertification row → set ceuPaidAt.
-          // External users (no cert) do not → grant 30-day access window.
+          // ── New-style session: route by full-cert ownership ───────────────────
+          // Full-cert users have a UserCertification row with isCeuOnly === false → set ceuPaidAt.
+          // External/CEU-only users (no cert, or isCeuOnly === true) → grant 30-day access window.
+          // Checking isCeuOnly prevents returning CEU-only users from being misclassified
+          // as internal users when they repurchase (they also have a UserCertification row).
           const userCert = await prisma.userCertification.findUnique({
             where: { clerkUserId_examId: { clerkUserId, examId } },
           });
 
-          if (userCert) {
-            // Internal user: mark ceuPaidAt to unlock the renewal exam.
+          if (userCert && !userCert.isCeuOnly) {
+            // Full-cert internal user: mark ceuPaidAt to unlock the renewal exam.
             await prisma.userCertification.update({
               where: { clerkUserId_examId: { clerkUserId, examId } },
               data: { ceuPaidAt: new Date() },
             });
-            console.log("CEU payment recorded (examId) for internal user:", clerkUserId);
+            console.log("CEU payment recorded (examId) for full-cert user:", clerkUserId);
 
             // Dual-write: keep legacy Certification in sync while table still exists.
             try {
@@ -247,8 +258,8 @@ app.post("/create-checkout-session", async (req, res) => {
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       line_items: [{ price: EEO_EXAM.stripePriceId, quantity: 1 }],
-      success_url: `${process.env.CLIENT_URL || "http://localhost:5173"}/checkout-success`,
-      cancel_url: `${process.env.CLIENT_URL || "http://localhost:5173"}/`,
+      success_url: `${process.env.CLIENT_URL || req.headers.origin || "http://localhost:5175"}/checkout-success`,
+      cancel_url: `${process.env.CLIENT_URL || req.headers.origin || "http://localhost:5175"}/`,
       metadata: { clerkUserId },
     });
     res.json({ url: session.url });
@@ -266,7 +277,7 @@ app.post("/create-ceu-checkout-session", clerkMiddleware(), async (req, res) => 
     return res.status(401).json({ error: "Unauthorized" });
   }
 
-  const CLIENT_URL = process.env.CLIENT_URL || "http://localhost:5173";
+  const CLIENT_URL = process.env.CLIENT_URL || req.headers.origin || "http://localhost:5175";
   const successUrl = `${CLIENT_URL}/ceu?type=paid`;
   const cancelUrl = `${CLIENT_URL}/ceu?type=cancel`;
 
@@ -291,7 +302,7 @@ app.post("/create-extend-access-session", clerkMiddleware(), async (req, res) =>
     return res.status(401).json({ error: "Unauthorized" });
   }
 
-  const CLIENT_URL = process.env.CLIENT_URL || "http://localhost:5173";
+  const CLIENT_URL = process.env.CLIENT_URL || req.headers.origin || "http://localhost:5175";
 
   try {
     const session = await stripe.checkout.sessions.create({
@@ -317,21 +328,46 @@ app.post("/ceu-complete", clerkMiddleware(), async (req, res) => {
     return res.status(401).json({ success: false, error: "Unauthorized" });
   }
 
+  const fullNameFromBody = typeof req.body?.fullName === "string" ? req.body.fullName.trim() || null : null;
+
+  // Helper: generate a unique certificate ID with the given prefix.
+  function generateCertId(prefix) {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    const suffix = Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+    return `${prefix}-${suffix}`;
+  }
+
+  let certificateId = null;
+  let expiresAt = null;
+  let isNew = false;
+
   try {
     const userCert = await prisma.userCertification.findUnique({
       where: { clerkUserId_examId: { clerkUserId, examId: EEO_EXAM.id } },
     });
 
     if (userCert?.ceuPaidAt) {
-      // Internal user: ceuPaidAt confirms payment — complete the renewal.
+      // ── Internal user: ceuPaidAt confirms payment — complete the renewal. ──
       const issuedAt = new Date();
-      const expiresAt = new Date(userCert.expiresAt);
+      expiresAt = new Date(userCert.expiresAt);
       expiresAt.setFullYear(expiresAt.getFullYear() + 1);
 
-      await prisma.userCertification.update({
+      // Assign a certificateId if the row doesn't have one yet.
+      const assignId = !userCert.certificateId;
+      const newId = assignId ? generateCertId("WCI-EEO") : undefined;
+
+      const updated = await prisma.userCertification.update({
         where: { clerkUserId_examId: { clerkUserId, examId: EEO_EXAM.id } },
-        data: { renewedAt: issuedAt, issuedAt, expiresAt, ceuPaidAt: null },
+        data: {
+          renewedAt: issuedAt,
+          issuedAt,
+          expiresAt,
+          ceuPaidAt: null,
+          ...(assignId ? { certificateId: newId } : {}),
+        },
+        select: { certificateId: true },
       });
+      certificateId = updated.certificateId;
 
       // Dual-write: keep legacy Certification in sync while table still exists.
       try {
@@ -348,15 +384,70 @@ app.post("/ceu-complete", clerkMiddleware(), async (req, res) => {
       } catch (err) {
         console.error("[dual-write] Legacy Certification renewal update failed:", err.message);
       }
+
+    } else {
+      // ── External user path: check 30-day CEU access window. ──
+      const access = await prisma.examAccess.findUnique({
+        where: { clerkUserId_examId: { clerkUserId, examId: EEO_EXAM.id } },
+      });
+
+      // Guard: ExamAccess must exist with an active (future) ceuAccessUntil.
+      // Without a valid purchase token, do not issue a certificate.
+      if (!access || !access.ceuAccessUntil || access.ceuAccessUntil <= new Date()) {
+        if (userCert) {
+          // Safety: a UserCertification already exists but no valid ExamAccess — invalid state.
+          console.warn(
+            "[/ceu-complete] UserCertification exists but ExamAccess is missing or expired — invalid state for user:",
+            clerkUserId,
+          );
+        } else {
+          console.warn("[/ceu-complete] CEU completion blocked — no valid ExamAccess for user:", clerkUserId);
+        }
+        return res.status(403).json({ success: false, error: "No active CEU access" });
+      }
+
+      const issuedAt = new Date();
+      expiresAt = new Date(issuedAt);
+      expiresAt.setFullYear(expiresAt.getFullYear() + 1);
+
+      const existing = await prisma.userCertification.findUnique({
+        where: { clerkUserId_examId: { clerkUserId, examId: EEO_EXAM.id } },
+        select: { certificateId: true },
+      });
+      isNew = !existing;
+
+      const newCertId = generateCertId("WCI-CEU");
+      const assignId = !existing?.certificateId;
+
+      const result = await prisma.userCertification.upsert({
+        where: { clerkUserId_examId: { clerkUserId, examId: EEO_EXAM.id } },
+        create: {
+          clerkUserId,
+          examId: EEO_EXAM.id,
+          certificateId: newCertId,
+          fullName: fullNameFromBody,
+          issuedAt,
+          expiresAt,
+          isCeuOnly: true,
+        },
+        update: {
+          renewedAt: issuedAt,
+          issuedAt,
+          expiresAt,
+          isCeuOnly: true,
+          ...(assignId ? { certificateId: newCertId } : {}),
+          ...(fullNameFromBody ? { fullName: fullNameFromBody } : {}),
+        },
+        select: { certificateId: true },
+      });
+      certificateId = result.certificateId;
     }
-    // External user: no UserCertification row or ceuPaidAt is null — no-op intentional.
-    // External users' 30-day CEU window expires naturally via ExamAccess.ceuAccessUntil.
   } catch (err) {
     console.error("[/ceu-complete]", err.message);
     return res.status(500).json({ success: false, error: "Failed to record renewal" });
   }
 
-  return res.json({ success: true });
+  return res.json({ success: true, certificateId, expiresAt, isNew });
 });
 
 // ── CEU exam access check ─────────────────────────────────────────────────────
@@ -387,6 +478,37 @@ app.get("/ceu-access", clerkMiddleware(), async (req, res) => {
   } catch (err) {
     console.error("[/ceu-access]", err.message);
     res.status(500).json({ allowed: false });
+  }
+});
+
+// ── All certifications for current user ──────────────────────────────────────
+app.get("/my-certifications", clerkMiddleware(), async (req, res) => {
+  const { userId: clerkUserId } = getAuth(req);
+  if (!clerkUserId) return res.status(401).json({ error: "Unauthorized" });
+  try {
+    const certs = await prisma.userCertification.findMany({
+      where: { clerkUserId },
+      select: {
+        certificateId: true,
+        fullName: true,
+        issuedAt: true,
+        expiresAt: true,
+        renewedAt: true,
+        exam: { select: { title: true } },
+      },
+      orderBy: { issuedAt: "desc" },
+    });
+    res.json(certs.map((c) => ({
+      certificateId: c.certificateId,
+      fullName: c.fullName,
+      issuedAt: c.issuedAt,
+      expiresAt: c.expiresAt,
+      renewedAt: c.renewedAt,
+      examTitle: c.exam.title,
+    })));
+  } catch (err) {
+    console.error("[/my-certifications]", err.message);
+    res.status(500).json({ error: "Failed to load certifications" });
   }
 });
 
@@ -573,6 +695,80 @@ app.post("/set-full-name", clerkMiddleware(), async (req, res) => {
   }
 });
 
+// ── Report Builder: AI feedback ──────────────────────────────────────────────
+// Evaluates a user-written investigation report against EEOC best practices.
+// Returns { wellDone, improve, suggestions } — no score, no pass/fail.
+app.post("/report-feedback", clerkMiddleware(), async (req, res) => {
+  const { userId: clerkUserId } = getAuth(req);
+  if (!clerkUserId) return res.status(401).json({ error: "Unauthorized" });
+
+  const { summary = "", parties = "", allegations = "", steps = "", findings = "", conclusion = "" } = req.body ?? {};
+
+  const reportText = [
+    `Complaint Summary:\n${summary || "(not provided)"}`,
+    `Parties Involved:\n${parties || "(not provided)"}`,
+    `Allegations:\n${allegations || "(not provided)"}`,
+    `Investigation Steps:\n${steps || "(not provided)"}`,
+    `Findings:\n${findings || "(not provided)"}`,
+    `Conclusion:\n${conclusion || "(not provided)"}`,
+  ].join("\n\n");
+
+  const userPrompt = `You are reviewing a workplace investigation report written by a learner in a professional certification program.
+
+Use the report content below to provide feedback that directly references what the learner wrote. Do not give generic advice. Evaluate based on clarity, completeness, structure, and alignment with EEOC best practices.
+
+Feedback rules:
+- Reference specific parts of the learner's input (e.g., "You mentioned X but did not address Y")
+- Point out what is missing based on what they actually included — not hypothetical gaps
+- Be constructive and professional
+- Do not give a score
+
+Return ONLY a valid JSON object with exactly these three keys:
+- "wellDone": what the learner did well, with direct reference to their content (2–4 sentences)
+- "improve": what is missing or weak, based specifically on what they wrote (2–4 sentences)
+- "suggestions": concrete suggestions for improvement tied to their actual input (2–4 sentences)
+
+Each value must be a single plain string. Do not return arrays. Do not use markdown fences or backticks. Return plain JSON only. Do not include any text outside the JSON object.
+
+Report:
+${reportText}`;
+
+  try {
+    const { default: Anthropic } = await import("@anthropic-ai/sdk");
+    const client = new Anthropic();
+    const message = await client.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 1024,
+      messages: [{ role: "user", content: userPrompt }],
+    });
+
+    const raw = message.content
+      .filter((b) => b.type === "text")
+      .map((b) => b.text)
+      .join("")
+      .trim();
+
+    let feedback;
+    try {
+      feedback = JSON.parse(raw);
+    } catch {
+      const match = raw.match(/\{[\s\S]*\}/);
+      if (!match) throw new Error("Failed to parse feedback JSON from model response");
+      feedback = JSON.parse(match[0]);
+    }
+
+    const normalize = (v) => Array.isArray(v) ? v.join(" ") : (v ?? "");
+    res.json({
+      wellDone:    normalize(feedback.wellDone),
+      improve:     normalize(feedback.improve),
+      suggestions: normalize(feedback.suggestions),
+    });
+  } catch (err) {
+    console.error("[/report-feedback]", err.message);
+    res.status(502).json({ error: "Feedback generation failed" });
+  }
+});
+
 // ── Owned exams — future dashboard source for multi-exam ownership ────────────
 // Returns one item per ExamAccess row for the current user, with related Exam
 // metadata and the associated UserCertification (if earned).
@@ -591,25 +787,30 @@ app.get("/my-exams", clerkMiddleware(), async (req, res) => {
 
     const certifications = await prisma.userCertification.findMany({
       where: { clerkUserId },
-      select: { examId: true, issuedAt: true, expiresAt: true, renewedAt: true, ceuPaidAt: true },
+      select: { examId: true, issuedAt: true, expiresAt: true, renewedAt: true, ceuPaidAt: true, isCeuOnly: true },
     });
 
     const certByExam = new Map(certifications.map((c) => [c.examId, c]));
 
     const result = accesses.map((a) => {
       const cert = certByExam.get(a.examId) ?? null;
+      // Only surface a UserCertification row as "certification" when the user
+      // actually earned the full certification (isCeuOnly === false).
+      // External CEU-only users have isCeuOnly === true and must not be treated
+      // as full certification owners on the dashboard.
+      const fullCert = cert && !cert.isCeuOnly ? cert : null;
       return {
         examId: a.examId,
         examTitle: a.exam.title,
         examSlug: a.exam.slug,
         purchasedAt: a.purchasedAt,
         ceuAccessUntil: a.ceuAccessUntil ?? null,
-        certification: cert
+        certification: fullCert
           ? {
-              issuedAt: cert.issuedAt,
-              expiresAt: cert.expiresAt,
-              renewedAt: cert.renewedAt ?? null,
-              ceuPaidAt: cert.ceuPaidAt ?? null,
+              issuedAt: fullCert.issuedAt,
+              expiresAt: fullCert.expiresAt,
+              renewedAt: fullCert.renewedAt ?? null,
+              ceuPaidAt: fullCert.ceuPaidAt ?? null,
             }
           : null,
       };
@@ -633,6 +834,7 @@ import { buildEeocNormalizedOutline } from "./services/eeoc-normalize-titles.js"
 import { buildEeocCertificationSkeleton } from "./services/eeoc-certification-builder.js";
 import { generateLessonContent }        from "./services/generate-lesson-content.js";
 import { generateCertificationContent } from "./services/generate-certification-content.js";
+import { generateCeuContent }           from "./services/generate-ceu-content.js";
 
 
 // ── Admin: Structured certification builder ───────────────────────────────────
@@ -1070,6 +1272,18 @@ app.post("/api/admin/scan-ceu-updates", async (req, res) => {
       },
     ],
   });
+});
+
+// ── Admin: Generate CEU content ───────────────────────────────────────────────
+// Generates a structured CEU renewal payload (4 modules + 20-question final exam)
+// grounded in federal EEO law. Returns CeuContent JSON — no DB writes.
+app.post("/api/admin/generate-ceu-content", async (_req, res) => {
+  try {
+    const payload = await generateCeuContent();
+    res.json(payload);
+  } catch (err) {
+    res.status(502).json({ error: err.message });
+  }
 });
 
 // ── Admin: EEOC source fetch test ────────────────────────────────────────────
