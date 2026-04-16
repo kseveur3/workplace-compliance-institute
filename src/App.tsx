@@ -109,6 +109,8 @@ const QUIZZES: SectionQuiz[] = [
           "Office of Personnel Management",
         ],
         correctIndex: 1,
+        explanation:
+          "The EEOC is the federal agency created by Title VII specifically to investigate and enforce EEO laws in the workplace. Other agencies like the DOL and DOJ have separate mandates that do not center on employment discrimination enforcement.",
       },
       {
         id: "q1-2",
@@ -121,6 +123,8 @@ const QUIZZES: SectionQuiz[] = [
           "National origin",
         ],
         correctIndex: 2,
+        explanation:
+          "Title VII protects race, color, religion, sex, and national origin — but political affiliation is not a covered category. Political views are not a protected class under federal EEO law.",
       },
     ],
   },
@@ -137,6 +141,8 @@ const QUIZZES: SectionQuiz[] = [
           "Retaliates against an employee for filing a complaint",
         ],
         correctIndex: 1,
+        explanation:
+          "Disparate treatment is intentional discrimination — the employer treats an individual differently because of a protected characteristic. Option A describes disparate impact, which is a separate theory based on neutral policies with discriminatory effects.",
       },
       {
         id: "q2-2",
@@ -148,6 +154,8 @@ const QUIZZES: SectionQuiz[] = [
           "Committed only by a direct supervisor",
         ],
         correctIndex: 2,
+        explanation:
+          "Courts require that harassment be both subjectively offensive (the victim found it hostile) and objectively offensive (a reasonable person would too). Physical conduct or formal HR reporting are not required elements, and harassers can be peers or supervisors alike.",
       },
     ],
   },
@@ -328,6 +336,7 @@ function loadActiveQuizzes(): SectionQuiz[] {
               question: string;
               options: string[];
               correctIndex: number;
+              explanation?: string;
             }[];
           }[]
         ).map((sq, si) => ({
@@ -337,6 +346,7 @@ function loadActiveQuizzes(): SectionQuiz[] {
             question: q.question,
             options: q.options,
             correctIndex: q.correctIndex,
+            explanation: q.explanation,
           })),
         }));
       }
