@@ -399,6 +399,43 @@
 
 
 /* ──────────────────────────────────────────────────────────
+   CHECKOUT STATUS PAGES
+   Covers /checkout-success and /checkout-cancel states.
+   ────────────────────────────────────────────────────────── */
+
+.checkout-shell {
+  padding: var(--space-16) var(--space-8);
+  max-width: 480px;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-5);
+  text-align: center;
+}
+
+.checkout-shell h1 {
+  margin: 0;
+  font-size: var(--text-3xl);
+}
+
+.checkout-shell p {
+  max-width: 360px;
+  color: var(--color-text-secondary);
+  line-height: var(--leading-normal);
+  margin: 0;
+}
+
+@media (max-width: 480px) {
+  .checkout-shell {
+    padding: var(--space-10) var(--space-5);
+  }
+}
+
+
+/* ──────────────────────────────────────────────────────────
    LESSON PAGE — header block
    ────────────────────────────────────────────────────────── */
 

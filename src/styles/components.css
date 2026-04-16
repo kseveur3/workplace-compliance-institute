@@ -98,6 +98,55 @@ button:disabled {
   box-shadow: var(--shadow-xs);
 }
 
+/* Anchor elements (<a> / <Link>) used with btn-primary / btn-secondary.
+   The global button{} selector only targets native buttons, so anchors
+   with these classes need explicit shape/layout rules. */
+a.btn-primary,
+a.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  letter-spacing: var(--tracking-wide);
+  padding: var(--space-3) var(--space-5);
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  line-height: var(--leading-tight);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+a.btn-primary {
+  background-color: var(--color-navy);
+  color: var(--color-text-inverse);
+  border: 1px solid var(--color-navy-dark);
+}
+
+a.btn-primary:hover {
+  background-color: var(--color-navy-mid);
+  border-color: var(--color-navy-mid);
+  box-shadow: var(--shadow-xs);
+  color: var(--color-text-inverse);
+  text-decoration: none;
+}
+
+a.btn-secondary {
+  background-color: var(--color-white);
+  color: var(--color-navy);
+  border: 1px solid var(--color-border);
+}
+
+a.btn-secondary:hover {
+  background-color: var(--color-cream, #f8f6f1);
+  border-color: var(--color-navy);
+  box-shadow: var(--shadow-xs);
+  color: var(--color-navy);
+  text-decoration: none;
+}
+
 
 /* ──────────────────────────────────────────────────────────
    2. FORM CONTROLS

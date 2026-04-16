@@ -2736,6 +2736,9 @@ function DashboardPage() {
                   </Link>
                 </div>
               </div>
+              <div className="action-row" style={{ marginTop: "var(--space-8)" }}>
+                <SignOutButton />
+              </div>
             </div>
           );
         }
@@ -2744,7 +2747,7 @@ function DashboardPage() {
           <div key={exam.examId}>
             <div
               className="info-panel info-panel--warm info-panel--featured"
-              style={{ marginBottom: "var(--sp-6)" }}
+              style={{ marginBottom: "var(--space-6)" }}
             >
               <p className="info-panel__title">{exam.examTitle}</p>
               {isEeo && !isCeuOnly && (
@@ -2817,7 +2820,7 @@ function DashboardPage() {
             {isEeo && (
               <div
                 className="action-row"
-                style={{ marginBottom: "var(--sp-6)" }}
+                style={{ marginBottom: "var(--space-6)" }}
               >
                 {isCeuOnly && (
                   <Link to="/ceu" className="btn-primary">
@@ -2848,7 +2851,7 @@ function DashboardPage() {
                           display: "flex",
                           flexDirection: "column",
                           alignItems: "flex-start",
-                          gap: "var(--sp-1)",
+                          gap: "var(--space-1)",
                         }}
                       >
                         <Link to={to} className="btn-primary">
@@ -2894,6 +2897,9 @@ function DashboardPage() {
                 )}
               </div>
             )}
+            <div className="action-row" style={{ marginTop: "var(--space-8)" }}>
+              <SignOutButton />
+            </div>
           </div>
         );
       })}
@@ -2979,9 +2985,6 @@ function DashboardPage() {
         </>
       )}
 
-      <div className="action-row">
-        <SignOutButton />
-      </div>
     </div>
   );
 }

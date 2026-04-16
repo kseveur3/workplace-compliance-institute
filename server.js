@@ -157,7 +157,9 @@ app.post(
           });
           console.log("CEU payment recorded (certId legacy) for cert:", certId, "user:", clerkUserId);
 
-          // Dual-write: mirror ceuPaidAt into UserCertification if it exists.
+          // Required entitlement write: UserCertification.ceuPaidAt is the primary
+          // field read by /ceu-access for internal users. Re-throw on failure so
+          // Stripe retries. The "not found" case is intentional and not an error.
           try {
             const userCert = await prisma.userCertification.findUnique({
               where: { clerkUserId_examId: { clerkUserId, examId: EEO_EXAM.id } },
@@ -171,7 +173,11 @@ app.post(
               console.warn("[dual-write] UserCertification not found for legacy CEU, skipping:", clerkUserId);
             }
           } catch (err) {
-            console.error("[dual-write] UserCertification ceuPaidAt update failed:", err.message);
+            console.error(
+              "[stripe-webhook] CRITICAL: UserCertification ceuPaidAt update failed — user will have no CEU access.",
+              { clerkUserId, examId: EEO_EXAM.id, sessionId: session.id, error: err.message },
+            );
+            throw err;
           }
         } else {
           // ── Legacy in-flight session: external user (certId was "") ──────────
@@ -184,7 +190,9 @@ app.post(
           });
           console.log("CEU 30-day access granted (legacy external) for user:", clerkUserId, "until:", ceuAccessUntil);
 
-          // Dual-write: mirror CEU access window into ExamAccess.
+          // Required entitlement write: ExamAccess.ceuAccessUntil is the primary
+          // field read by /ceu-access for external users. Re-throw on failure so
+          // Stripe retries. Never swallow this error.
           try {
             await prisma.examAccess.upsert({
               where: { clerkUserId_examId: { clerkUserId, examId: EEO_EXAM.id } },
@@ -192,7 +200,11 @@ app.post(
               update: { ceuAccessUntil },
             });
           } catch (err) {
-            console.error("[dual-write] ExamAccess CEU upsert failed:", err.message);
+            console.error(
+              "[stripe-webhook] CRITICAL: ExamAccess CEU upsert failed — user will have no CEU access.",
+              { clerkUserId, examId: EEO_EXAM.id, sessionId: session.id, error: err.message },
+            );
+            throw err;
           }
         }
       } else if (session.metadata?.productType === "extend_access") {
@@ -217,25 +229,41 @@ app.post(
 
         // Create a Certification record so renewal reminders can track expiry.
         // issuedAt = now, expiresAt = 1 year from now.
+        // Guard against duplicate rows on Stripe retry: only create if no row
+        // exists yet for this user. Certification has no unique constraint on
+        // clerkUserId so we cannot use upsert without a schema migration.
         const issuedAt = new Date();
         const expiresAt = new Date(issuedAt);
         expiresAt.setFullYear(expiresAt.getFullYear() + 1);
 
-        await prisma.certification.create({
-          data: { clerkUserId, issuedAt, expiresAt },
-        });
+        const existingCert = await prisma.certification.findFirst({ where: { clerkUserId } });
+        if (!existingCert) {
+          await prisma.certification.create({
+            data: { clerkUserId, issuedAt, expiresAt },
+          });
+          console.log("Created certification record for:", clerkUserId);
+        } else {
+          console.log("Certification record already exists, skipping create on retry for:", clerkUserId);
+        }
 
-        console.log("Created certification record for:", clerkUserId);
-
-        // Dual-write: mirror purchase entitlement into ExamAccess.
+        // Required entitlement write: ExamAccess is the primary table read by
+        // /payment-status and /my-exams. Re-throw on failure so Stripe receives
+        // a non-200 response and retries delivery. Never swallow this error.
         try {
           await prisma.examAccess.upsert({
             where: { clerkUserId_examId: { clerkUserId, examId: EEO_EXAM.id } },
             create: { clerkUserId, examId: EEO_EXAM.id },
-            update: {},
+            update: {
+              ceuAccessUntil: null,
+              purchasedAt: new Date(),
+            },
           });
         } catch (err) {
-          console.error("[dual-write] ExamAccess purchase upsert failed:", err.message);
+          console.error(
+            "[stripe-webhook] CRITICAL: ExamAccess upsert failed — user will have no dashboard access.",
+            { clerkUserId, examId: EEO_EXAM.id, sessionId: session.id, error: err.message },
+          );
+          throw err;
         }
       }
     }
