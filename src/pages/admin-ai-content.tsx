@@ -134,17 +134,40 @@ export function AdminAiContentPage() {
     setCertGenType(null)
     const t0 = Date.now()
     try {
-      const res = await fetch('/api/admin/generate-certification-eeoc-content', { method: 'POST' })
-      const text = await res.text()
-      const data = JSON.parse(text)
-      if (!res.ok) {
-        setCertError(data.error ?? 'Request failed.')
-      } else {
-        setCertResult(data)
-        setCertTimestamp(new Date())
-        setCertDurationMs(Date.now() - t0)
-        setCertGenType('Full Content')
+      // Start the background job
+      const startRes = await fetch('/api/admin/generate-certification-eeoc-content', { method: 'POST' })
+      if (!startRes.ok) {
+        const errData = await startRes.json().catch(() => ({}))
+        setCertError(errData.error ?? 'Failed to start generation job.')
+        return
       }
+      const { jobId } = await startRes.json()
+
+      // Poll until done or error
+      const POLL_INTERVAL_MS = 4000
+      const MAX_WAIT_MS = 10 * 60 * 1000 // 10 minutes
+      const deadline = Date.now() + MAX_WAIT_MS
+
+      while (Date.now() < deadline) {
+        await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS))
+        const pollRes = await fetch(`/api/admin/jobs/${jobId}`)
+        const pollData = await pollRes.json()
+
+        if (pollData.status === 'done') {
+          setCertResult(pollData.payload)
+          setCertTimestamp(new Date())
+          setCertDurationMs(Date.now() - t0)
+          setCertGenType('Full Content')
+          return
+        }
+        if (pollData.status === 'error') {
+          setCertError(pollData.error ?? 'Generation failed.')
+          return
+        }
+        // status === 'running' — keep polling
+      }
+
+      setCertError('Generation timed out. Check server logs.')
     } catch (err: any) {
       setCertError(err.message ?? 'Unexpected error.')
     } finally {
