@@ -48,6 +48,7 @@ interface QuizQuestion {
   question: string;
   options: string[];
   correctIndex: number;
+  explanation?: string;
 }
 
 interface SectionQuiz {
@@ -90,6 +91,8 @@ interface CeuContent {
   modules: CeuModule[];
   finalExam: QuizQuestion[];
 }
+
+type AssessmentMode = "ceu-section" | "ceu-final" | "cert-section" | "cert-final";
 
 const QUIZZES: SectionQuiz[] = [
   {
@@ -492,6 +495,8 @@ Investigators should also assess whether the employer sought sufficient medical 
                 "Treat this as a product liability matter and refer it to legal counsel without opening an investigation.",
               ],
               correctIndex: 0,
+              explanation:
+                "The investigation must assess whether the tool produced disparate impact and whether the employer can justify its use — and the only way to do that is to examine the validation data and selection rate analysis by protected class. Deferring to the vendor treats the investigation as someone else's responsibility; the employer deployed the tool and owns the employment decision it produced.",
             },
             {
               id: "ceu-m1-cs1-q2",
@@ -503,6 +508,8 @@ Investigators should also assess whether the employer sought sufficient medical 
                 "Has a complete defense if the tool was based on industry-standard benchmarks.",
               ],
               correctIndex: 1,
+              explanation:
+                "EEO liability attaches to the employment decision, not to who built the mechanism that produced it. An indemnification clause governs the contractual relationship between the employer and vendor — it does not transfer the employer's civil rights obligations. The employer selected, deployed, and relied on this tool, and is responsible for the outcomes it generated.",
             },
             {
               id: "ceu-m1-cs1-q3",
@@ -514,6 +521,8 @@ Investigators should also assess whether the employer sought sufficient medical 
                 "Request that the EEOC subpoena the vendor directly before the investigation can proceed.",
               ],
               correctIndex: 2,
+              explanation:
+                "An inability to compel a third party does not close the investigation — it produces a finding of its own (the refusal must be documented) and shifts focus to what evidence is within reach. The employer's internal selection rate data by age group is entirely obtainable and must be analyzed. Stopping the investigation because one source was unavailable leaves the rest of the record unexamined.",
             },
             {
               id: "ceu-m1-cs1-q4",
@@ -525,6 +534,8 @@ Investigators should also assess whether the employer sought sufficient medical 
                 "Ask the complaining applicant to submit to a supplemental interview to cure the selection gap.",
               ],
               correctIndex: 0,
+              explanation:
+                "Once disparate impact is confirmed, continuing to use the tool accumulates further liability while remediation is being assessed — suspension is the minimum required response. Reviewing affected applicant files is essential to determine the scope of harm and what corrective action is owed. A validation study or a public statement about neutrality does not address the demonstrated harm to applicants who have already been screened out.",
             },
           ],
           explanation: `AI hiring tools do not insulate employers from EEO liability — they are employer decisions. TechForward selected, deployed, and relied on this tool, and it is responsible for the tool's outputs regardless of who built it. The investigation must focus on: (1) obtaining validation data to understand what criteria the tool applies and whether those criteria were tested against protected class outcomes; (2) documenting any refusal to share that data, which itself becomes a relevant finding; (3) assessing the employer's own internal selection rate data to determine whether disparate impact is confirmed statistically. If confirmed, the employer must take corrective action — at minimum suspending use of the tool for new decisions and reviewing applicants who may have been adversely screened out. The vendor's indemnification clause is a contractual matter between the parties that does not affect the employer's civil rights obligations. The absence of a specific human decision-maker does not eliminate the discrimination claim; it changes the evidence-gathering strategy.`,
@@ -542,6 +553,8 @@ Investigators should also assess whether the employer sought sufficient medical 
                 "When Maya resigned — the constructive discharge is itself the ADA violation.",
               ],
               correctIndex: 1,
+              explanation:
+                "Requesting documentation is a legitimate step in the interactive process — the failure was not the request, but what happened after Maya complied. Once an employee provides what the employer asked for, the employer must respond substantively. Two months of silence after documentation is submitted is a clear failure to engage in good faith, and it is independently actionable regardless of whether an accommodation was ultimately available.",
             },
             {
               id: "ceu-m1-cs2-q2",
@@ -553,6 +566,8 @@ Investigators should also assess whether the employer sought sufficient medical 
                 "Voluntary resignation always breaks the causal chain between the accommodation failure and any resulting damages.",
               ],
               correctIndex: 1,
+              explanation:
+                "Constructive discharge uses an objective standard: would a reasonable person in this employee's position have felt compelled to resign? It does not require an explicit ultimatum, nor does it require proof of intentional discrimination — a prolonged, unresolved ADA process failure with no response in sight satisfies the standard. A voluntary resignation under those conditions does not break the causal chain; it is the foreseeable result of the employer's failure to act.",
             },
             {
               id: "ceu-m1-cs2-q3",
@@ -564,6 +579,8 @@ Investigators should also assess whether the employer sought sufficient medical 
                 "The HR intake record and the employer's position statement submitted to the EEOC.",
               ],
               correctIndex: 1,
+              explanation:
+                "The process failure in this case may be most visible in communications that never reached Maya — internal HR discussions, notes from the September meeting, and any exchanges following her November submission. A narrow document request would miss this evidence entirely. When the core allegation is a failure to act, the full internal record of how the employer handled the request is the most critical category of evidence to obtain.",
             },
           ],
           explanation: `The ADA interactive process is an ongoing, good-faith exchange — not a one-time acknowledgment. Once an employee submits the documentation the employer requested, the employer must respond substantively. Two months of silence after documentation is submitted — with no evaluation, no counter-proposal, and no explanation — is a failure to engage in the interactive process in good faith, and is independently actionable regardless of whether a reasonable accommodation was ultimately available. The document request in this investigation must be comprehensive: all internal communications about how to handle the request matter, because the process failure may be visible in internal discussions that never reached Maya. On constructive discharge: the standard is objective — would a reasonable person in Maya's position have felt compelled to resign? Months of ADA-mandated process inaction, with no end in sight, is exactly the factual pattern that supports this claim. Both the process failure and the discharge claim must be fully documented and analyzed.`,
@@ -608,6 +625,8 @@ Investigators should also assess whether the employer sought sufficient medical 
             "Request a written statement from the manager explaining the meeting invitation decisions.",
           ],
           correctIndex: 2,
+          explanation:
+            "Exclusion from meetings where assignments and visibility opportunities are distributed can constitute disparate treatment even without a formal adverse action. The investigator's first step is to interview the complainant to establish the pattern, frequency, and impact — building the factual record needed to assess whether the exclusion correlates with a protected characteristic.",
         },
         {
           id: "ceu-m1-q2",
@@ -620,6 +639,8 @@ Investigators should also assess whether the employer sought sufficient medical 
             "Excluded from Title VII coverage unless it results in a tangible employment action.",
           ],
           correctIndex: 1,
+          explanation:
+            "The medium of communication does not change the legal analysis. Digital conduct is evaluated against the same hostile work environment standard as in-person conduct — frequency, severity, whether it unreasonably interferes with work performance, and whether it is pervasive enough to alter the conditions of employment.",
         },
         {
           id: "ceu-m1-q3",
@@ -632,6 +653,8 @@ Investigators should also assess whether the employer sought sufficient medical 
             "Is relevant only if the complainant can show the manager used the same reasoning for other candidates.",
           ],
           correctIndex: 2,
+          explanation:
+            "Statements reflecting sex-based caregiving stereotypes can constitute circumstantial evidence of discriminatory intent even when made informally and before a formal decision. The investigator's role is to document and analyze such statements — whether they are ultimately determinative is a factual conclusion, but excluding them at the intake stage would leave a material gap in the record.",
         },
       ],
     },
@@ -741,6 +764,8 @@ Investigators should also distinguish between two different types of "unable to 
                 "Note in the report that Slack records were identified but not obtained due to time constraints.",
               ],
               correctIndex: 1,
+              explanation:
+                "Evidence that was specifically referenced by the complainant must be gathered before the investigation is finalized — investigator confidence in the outcome does not justify skipping obtainable evidence. Asking Priya to provide screenshots herself shifts the evidentiary burden to the complainant and compromises the neutrality of the record. An investigation that bypasses identified, accessible evidence cannot be described as thorough.",
             },
             {
               id: "ceu-m2-cs1-q2",
@@ -752,6 +777,8 @@ Investigators should also distinguish between two different types of "unable to 
                 "Admissible as a defense only if Priya is given a formal opportunity to rebut it during a second interview.",
               ],
               correctIndex: 2,
+              explanation:
+                "'Hypersensitive' is a characterization, not a factual defense, and it does not shift the burden of proof or substitute for substantive credibility analysis. The investigator must document it as part of Devon's account, then weigh Devon's credibility on the basis of articulable factors — consistency, corroboration, level of detail — that would survive review. Allowing a respondent's characterization of the complainant to anchor the credibility analysis is an investigation quality failure.",
             },
             {
               id: "ceu-m2-cs1-q3",
@@ -763,6 +790,8 @@ Investigators should also distinguish between two different types of "unable to 
                 "Produce an automatic 'unable to determine' finding whenever witness accounts diverge on a material point.",
               ],
               correctIndex: 1,
+              explanation:
+                "Credibility is not a voting process — a numerical majority of witnesses who noticed nothing does not neutralize a single witness who describes specific incidents with particularity. 'Did not notice' is evidence of inattention, not contradiction. A detailed, consistent account with specific dates and language carries independent evidentiary weight that must be assessed on its merits, not discounted by headcount.",
             },
             {
               id: "ceu-m2-cs1-q4",
@@ -774,6 +803,8 @@ Investigators should also distinguish between two different types of "unable to 
                 "Immediately substantiate the complaint based on the documentary evidence alone, without further analysis.",
               ],
               correctIndex: 0,
+              explanation:
+                "The preponderance standard applies to the full record as assembled — not to the partial record that existed before a key document was reviewed. Documentary evidence of the conduct must be incorporated into the credibility analysis and the overall finding; it cannot be dismissed as supplementary or treated as though the prior interviews have settled the matter. The finding may change, or the existing analysis may be reinforced — but either outcome must reflect the complete record.",
             },
           ],
           explanation: `The central error in this case is the failure to gather available documentary evidence before drafting a finding. Priya referenced the Slack channel — it is an identified, obtainable source that has not been examined. An investigation that does not request evidence the complainant specifically mentioned is not complete, and a finding based on that incomplete record is not defensible. On credibility: two witnesses who 'did not notice' something do not neutralize one witness who can describe specific incidents with particularity. Inattention is not contradiction. On the Slack evidence: if obtained, it must be factored into the analysis. The preponderance standard applies to the full record as ultimately assembled — not to the record as it existed before a particular point in the investigation. The finding may change, or the existing credibility analysis may be confirmed with additional support. Either way, the record must be complete before the finding is written.`,
@@ -791,6 +822,8 @@ Investigators should also distinguish between two different types of "unable to 
                 "Advise the witness that prior conduct is outside scope and should not be raised again during the investigation.",
               ],
               correctIndex: 1,
+              explanation:
+                "Two independent witness references to prior issues with the same respondent are potential pattern evidence — not background noise to be disregarded or redirected. The investigator cannot assess the relevance of prior conduct without first understanding what the witnesses know. Following up, documenting, and determining whether to request prior complaint records is not an expansion of scope; it is basic due diligence.",
             },
             {
               id: "ceu-m2-cs2-q2",
@@ -802,6 +835,8 @@ Investigators should also distinguish between two different types of "unable to 
                 "Automatic — information from prior departments involving different complainants is always outside scope.",
               ],
               correctIndex: 1,
+              explanation:
+                "Any decision to limit investigative scope is a substantive judgment that must be documented with a genuine rationale. 'Outside scope' is a characterization of the decision, not an explanation for it. An undocumented verbal scope limitation creates the appearance of informal suppression and leaves no record that the decision was considered at all — which compounds the vulnerability if the matter is ever reviewed.",
             },
             {
               id: "ceu-m2-cs2-q3",
@@ -813,6 +848,8 @@ Investigators should also distinguish between two different types of "unable to 
                 "Can substitute for witness testimony if direct access to prior complainants is unavailable.",
               ],
               correctIndex: 1,
+              explanation:
+                "Prior conduct records bear on two issues that the current investigation must assess: whether the respondent has a pattern of similar conduct, and whether the employer previously had notice and failed to take adequate action. A pattern of inaction by the employer may itself be relevant to the current finding and to the scope of remediation. The relevance goes well beyond impeaching the respondent — it goes to the employer's liability.",
             },
           ],
           explanation: `Pattern evidence is not a distraction from the current investigation — it bears directly on whether the conduct was deliberate and sustained, whether the employer had prior notice, and what remediation the current complaint may require. Two witnesses independently referencing prior problems with the same respondent is significant enough to warrant follow-up: at minimum, requesting prior complaint files and HR records from the earlier department to determine what was alleged and how it was resolved. Choosing not to pursue this information is a scope decision that must be documented with a genuine rationale — not an implicit decision to stay narrow. If prior complaints were closed without action, that pattern of inaction may itself be relevant to what the employer knew and what remediation is now required. The phrase "outside scope" is not a rationale; it is a characterization of the assignment that needs justification.`,
@@ -857,6 +894,8 @@ Investigators should also distinguish between two different types of "unable to 
             "Suspend the investigation until the witness provides a written sworn statement.",
           ],
           correctIndex: 1,
+          explanation:
+            "A defensible credibility determination requires that each party has had the opportunity to address material contradictions in the record. Re-interviewing the complainant specifically about the inconsistency allows the investigator to assess whether the conflict reflects a misunderstanding, a memory gap, or a genuine factual dispute — and ensures the final credibility analysis rests on a complete, not one-sided, record.",
         },
         {
           id: "ceu-m2-q2",
@@ -869,6 +908,8 @@ Investigators should also distinguish between two different types of "unable to 
             "Request and review the emails before finalizing — even if they confirm the conclusion, the investigation record must be complete.",
           ],
           correctIndex: 3,
+          explanation:
+            "An investigator's confidence in the outcome does not justify leaving accessible evidence unreviewed. The standard is completeness, not outcome certainty — available documentary evidence must be gathered and evaluated before the report is finalized. An unreviewed but obtainable record is a defensibility vulnerability regardless of what the finding ultimately states.",
         },
         {
           id: "ceu-m2-q3",
@@ -881,6 +922,8 @@ Investigators should also distinguish between two different types of "unable to 
             "May represent pattern evidence and should be documented and explored through additional follow-up.",
           ],
           correctIndex: 3,
+          explanation:
+            "Prior conduct by the same respondent is potential pattern evidence that is directly relevant to the current complaint and to the employer's notice obligations. Even if the prior experience was never formally reported, the investigator must document this lead and attempt to follow up — because a repeated pattern of conduct calls for different findings and different remediation than an isolated incident.",
         },
       ],
     },
@@ -1000,6 +1043,8 @@ Finally, the "severity and pervasiveness" analysis in remote environments may re
                 "Whether Marcus made the comments before or after the formal dinner portion of the event concluded.",
               ],
               correctIndex: 2,
+              explanation:
+                "The investigation obligation turns on sponsorship and control, not on voluntary attendance or the harasser's precise employment relationship. Westfield organized the dinner, all partners attended, and Westfield contracted for the catering service — both sponsorship and authority over venue access are present. Whether to investigate is not a close question; the threshold gatekeeping tests proposed in the other options do not reflect the applicable standard.",
             },
             {
               id: "ceu-m3-cs1-q2",
@@ -1011,6 +1056,8 @@ Finally, the "severity and pervasiveness" analysis in remote environments may re
                 "Refer the Instagram evidence to Westfield's legal team only, since social media content requires formal legal process before it can be used in an investigation.",
               ],
               correctIndex: 1,
+              explanation:
+                "Publicly accessible social media evidence can be deleted at any time — preservation must happen immediately, before any other action. Waiting for a formal legal hold, requesting voluntary removal, or routing through legal before documenting risks losing the evidence entirely. Dated screenshots capturing the full URL, account name, content, and photograph are the correct preservation method for publicly visible posts.",
             },
             {
               id: "ceu-m3-cs1-q3",
@@ -1022,6 +1069,8 @@ Finally, the "severity and pervasiveness" analysis in remote environments may re
                 "Document the incident and formally refer it to the catering company for resolution, retaining no further involvement.",
               ],
               correctIndex: 2,
+              explanation:
+                "The harasser's employment status affects what remedies are available, not whether Westfield must act. Westfield had notice, sponsored the event, and controls the catering relationship — it has both an obligation to investigate and authority to take corrective action, which may include modifying or terminating the contract. Referral to the catering company without independent investigation does not satisfy Westfield's EEO response obligations.",
             },
             {
               id: "ceu-m3-cs1-q4",
@@ -1033,6 +1082,8 @@ Finally, the "severity and pervasiveness" analysis in remote environments may re
                 "Apply a heightened evidentiary standard to the gender expression claim before including it in scope.",
               ],
               correctIndex: 1,
+              explanation:
+                "Post-Bostock, Title VII protects gender identity and gender expression under the same framework as other sex-based claims. There is no procedural basis for a separate file, no heightened evidentiary standard, and no justification for limiting the investigation to the easier claim. The complainant has described a single course of conduct — the investigation must address it in full.",
             },
           ],
           explanation: `All three substantive issues in this case arise from a common investigative error: applying threshold gatekeeping before it belongs. Whether the event was "really" a work event, whether the bartender is "really" covered by the employer's EEO obligations, and whether the gender expression conduct "really" belongs in this investigation are all legal determinations that follow the factual record — they are not conditions for opening the investigation. Open the investigation, gather the facts, and let the analysis follow. On the Instagram post: social media evidence that exists today may not exist tomorrow. Preserve it immediately regardless of whether a formal legal hold has been issued. On third-party liability: Westfield had notice (Ren reported), had authority over the catering relationship, and is responsible for the failure to act. On the unified complaint: Title VII post-Bostock covers gender identity and expression. No separate file, no elevated standard. The same analytical framework applies to all protected characteristics.`,
@@ -1065,6 +1116,8 @@ Finally, the "severity and pervasiveness" analysis in remote environments may re
             "Only if the employee has first filed a formal charge with the EEOC naming both parties.",
           ],
           correctIndex: 0,
+          explanation:
+            "Under Title VII and EEOC guidance, employers can be liable for harassment by non-employees — including contractors, vendors, and clients — when the employer knew or should have known about the conduct and had the authority to take corrective action. The harasser's employment status affects the scope of remedies available, not the employer's duty to investigate.",
         },
         {
           id: "ceu-m3-q2",
@@ -1077,6 +1130,8 @@ Finally, the "severity and pervasiveness" analysis in remote environments may re
             "Limit the investigation to documenting whether attendance at the event was voluntary or mandatory.",
           ],
           correctIndex: 2,
+          explanation:
+            "Employer-sponsored events are generally treated as an extension of the workplace under Title VII, regardless of the off-site location or after-hours timing. The presence of a supervisory relationship strengthens this analysis further. Location and time of day determine logistical considerations, not whether the investigator's standard obligations apply.",
         },
         {
           id: "ceu-m3-q3",
@@ -1089,6 +1144,8 @@ Finally, the "severity and pervasiveness" analysis in remote environments may re
             "Return it to the complainant and ask her to identify a single primary protected characteristic before proceeding.",
           ],
           correctIndex: 2,
+          explanation:
+            "Intersectional discrimination theory recognizes that an employee can face treatment that targets a specific combination of protected characteristics in a way that would not apply to members of either group alone. Requiring the complainant to reduce her experience to a single characteristic, or splitting it into parallel claims, would misrepresent the alleged harm and risk leaving the actual conduct unanalyzed.",
         },
       ],
     },
@@ -1204,6 +1261,8 @@ The final report should include: a description of the complaint, the scope of th
                 "Aisha's five years of consistently excellent performance reviews.",
               ],
               correctIndex: 1,
+              explanation:
+                "Discriminatory motive is most directly established by evidence showing how the decision-maker framed the decision before making it. The 'command the room' email establishes the hiring manager's evaluative lens; the 'executive presence' selection rationale shows that same lens applied to the outcome — in a context where the objective record favored Aisha. The other evidence documents the wrong result, but it doesn't show the subjective reasoning that produced it.",
             },
             {
               id: "ceu-m4-cs1-q2",
@@ -1215,6 +1274,8 @@ The final report should include: a description of the complaint, the scope of th
                 "Relevant only if Aisha can identify a specific comparator who was evaluated differently on the same criterion.",
               ],
               correctIndex: 1,
+              explanation:
+                "'Executive presence' is neither automatically legitimate nor automatically prohibited — it requires analysis. A selection criterion is more vulnerable to a discrimination finding when it is vague, undefined, applied inconsistently, and contradicts the objective record. Here, the criterion is undefined, was applied in a way that favored a weaker-performing candidate, and tracks pre-decisional language suggesting stereotypical assumptions. Appearing in a formal memo does not insulate it from scrutiny.",
             },
             {
               id: "ceu-m4-cs1-q3",
@@ -1226,6 +1287,8 @@ The final report should include: a description of the complaint, the scope of th
                 "Offer to include the hiring manager's rebuttal as a formal addendum to the report.",
               ],
               correctIndex: 2,
+              explanation:
+                "An attempt by a subject of the investigation to influence the findings is itself a significant event that must be documented — not accommodated. Revising factual findings under informal pressure from the person whose conduct is under review is a serious process integrity failure. The investigator's obligation is to report what the record supports; the appropriate response to pressure is documentation and escalation, not revision.",
             },
             {
               id: "ceu-m4-cs1-q4",
@@ -1237,6 +1300,8 @@ The final report should include: a description of the complaint, the scope of th
                 "'The hiring manager's conduct was improper and warrants immediate corrective action.'",
               ],
               correctIndex: 2,
+              explanation:
+                "A defensible finding names the specific evidence supporting it and applies the preponderance standard explicitly. Option A asserts a legal conclusion without evidentiary grounding. Option B misstates the standard — investigations require preponderance, not proof beyond doubt, and 'possible' understates what the record supports. Option D is a remediation statement, not a factual finding. Option C correctly grounds the conclusion in evidence and uses the right standard.",
             },
           ],
           explanation: `This case illustrates four documentation principles working together. First, discriminatory motive is frequently circumstantial: a combination of vague subjective criteria, pre-decisional statements, and outcomes inconsistent with objective qualifications can establish the necessary inference under the preponderance standard. The 'command the room' email plus the 'executive presence' selection rationale, in the context of a selection that contradicted the objective record, is exactly this kind of circumstantial pattern. Second, 'executive presence' is not automatically legitimate or automatically discriminatory — the analysis turns on whether it was specific, documented, and applied through objective measures or whether it was a vague subjective standard applied inconsistently. Third, post-conclusion pressure from the subject of the investigation to revise findings must be documented and escalated — not accommodated. Revising factual findings under informal pressure is a serious process integrity failure. Fourth, the report language must apply the preponderance standard explicitly: 'more likely than not' is the correct formulation. Conclusory language ('it is clear,' 'it is obvious') asserts certainty the evidence rarely justifies and invites challenge on that basis.`,
@@ -1254,6 +1319,8 @@ The final report should include: a description of the complaint, the scope of th
                 "It should default to 'not substantiated' when evidence is equal, since the complainant bears the burden of proof.",
               ],
               correctIndex: 1,
+              explanation:
+                "'Unable to determine' is a legitimate and recognized outcome — the problem is the documentation, not the finding itself. Two sentences that announce the conclusion without showing the evidence, the reasoning, or why resolution was impossible read as an abandoned investigation. A finding is defensible only when a reader can trace the path from evidence to conclusion without filling in gaps themselves.",
             },
             {
               id: "ceu-m4-cs2-q2",
@@ -1265,6 +1332,8 @@ The final report should include: a description of the complaint, the scope of th
                 "A legal analysis of whether the alleged comment, if it occurred, would meet the hostile environment threshold.",
               ],
               correctIndex: 1,
+              explanation:
+                "A defensible 'unable to determine' finding documents the complete analytical path: evidence gathered, what each piece supports, why the conflict resists resolution, and — critically — what additional evidence would have changed the outcome. That last element is what demonstrates the investigation was genuinely exhausted rather than prematurely closed. Without it, the finding looks like an exit, not a conclusion.",
             },
             {
               id: "ceu-m4-cs2-q3",
@@ -1276,6 +1345,8 @@ The final report should include: a description of the complaint, the scope of th
                 "List her as a witness in the report but omit her account from the credibility analysis.",
               ],
               correctIndex: 1,
+              explanation:
+                "An inattentive witness has not become irrelevant — acknowledged inattention is itself a finding that belongs in the record. Her account, including its limitation, must be documented and its weight assessed alongside the party accounts. Omitting it creates the appearance that available testimony was not gathered; listing her without analysis creates a gap in the credibility discussion. Both are documentary failures.",
             },
           ],
           explanation: `An 'unable to determine' finding is legitimate and professionally defensible — but only when it reflects a genuinely exhausted record and is documented with the same rigor as any other finding. The two-sentence version in this case reads as a premature exit from a difficult record, not a conclusion. A defensible version would: describe what evidence was gathered (party interviews, the witness account, a document search that produced no relevant records); explain what each piece supports (the complainant's account is consistent and detailed; the respondent's denial is equally consistent; the witness was present but inattentive); explain why the conflict cannot be resolved (no corroborating documentation, no other witnesses with direct knowledge); and note what additional evidence would have been needed to reach a more definitive conclusion (a second witness with direct attention to the conversation, or a contemporaneous document). The witness who "wasn't really paying attention" is still part of the factual record — document what she said and what weight it carries. Omitting it creates the appearance that the investigator overlooked available evidence.`,
@@ -1320,6 +1391,8 @@ The final report should include: a description of the complaint, the scope of th
             "Defer the finding and request that both parties submit additional evidence within 10 business days.",
           ],
           correctIndex: 1,
+          explanation:
+            "The preponderance standard asks whether it is more likely than not that the conduct occurred — it does not require the investigator to default to either party when the evidence is genuinely balanced. 'Unable to determine' is a legitimate finding when credible evidence conflicts and cannot be resolved, but it must be accompanied by a detailed explanation of what each piece of evidence supported and why resolution was not possible.",
         },
         {
           id: "ceu-m4-q2",
@@ -1332,6 +1405,8 @@ The final report should include: a description of the complaint, the scope of th
             "'Witness credibility was assessed based on consistency, detail, and corroboration with other evidence.'",
           ],
           correctIndex: 2,
+          explanation:
+            "Report findings must be grounded in the investigative standard — preponderance — and expressed as supported inferences, not established facts. Asserting that intent is 'clear' overstates what an investigation can determine, exposes the report to challenge on review, and may prejudge issues that are ultimately for a trier of fact to resolve. The correct formulation draws a conclusion from evidence rather than declaring it self-evident.",
         },
         {
           id: "ceu-m4-q3",
@@ -1344,6 +1419,8 @@ The final report should include: a description of the complaint, the scope of th
             "Advise her to file an EEOC charge if she disagrees with the outcome.",
           ],
           correctIndex: 0,
+          explanation:
+            "'Unable to determine' is an evidence-based conclusion about what the record could establish — it is not a credibility ruling against either party. Explaining this clearly is both fair to the complainant and important for the integrity of the process. Sharing your personal credibility assessment (option B) goes beyond the investigator's role in closing communications and risks mischaracterizing the finding to the complainant.",
         },
       ],
     },
@@ -3466,6 +3543,7 @@ function QuizPage() {
 
   const quiz = ACTIVE_QUIZZES.find((q) => q.sectionId === sectionId);
   const section = ACTIVE_COURSE.sections.find((s) => s.id === sectionId);
+  const assessmentMode: AssessmentMode = "cert-section";
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<(number | null)[]>(() =>
@@ -3581,7 +3659,7 @@ function QuizPage() {
   }
 
   return (
-    <div className="quiz-shell">
+    <div className="quiz-shell" data-assessment-mode={assessmentMode}>
       <Link to="/course" className="page-back-link">
         ← Back to Course
       </Link>
@@ -3727,6 +3805,7 @@ function FinalExamPage() {
     DEV_BYPASS_FINAL_EXAM ||
     isAdminExamPreview ||
     (allLessonsDone && allQuizzesPassed);
+  const assessmentMode: AssessmentMode = "cert-final";
 
   const examProgressKey = user?.id
     ? `wci_final_exam_progress_${user.id}`
@@ -4066,7 +4145,7 @@ function FinalExamPage() {
   );
 
   return (
-    <div className="exam-shell">
+    <div className="exam-shell" data-assessment-mode={assessmentMode}>
       <p className="quiz-context">Final Certification Exam</p>
 
       <div className="quiz-progress">
@@ -4751,22 +4830,90 @@ function CeuPage() {
               {question?.options.map((option, i) => (
                 <button
                   key={i}
-                  className={`quiz-option${selected === i ? " quiz-option--selected" : ""}`}
-                  onClick={() =>
+                  className={`quiz-option${
+                    selected !== null
+                      ? i === question!.correctIndex
+                        ? " quiz-option--correct"
+                        : i === selected
+                          ? " quiz-option--incorrect"
+                          : ""
+                      : selected === i
+                        ? " quiz-option--selected"
+                        : ""
+                  }`}
+                  onClick={() => {
+                    if (selected !== null) return; // locked after first pick
                     setCaseStudyAnswers((prev) => {
                       const next = prev.map((mArr) => mArr.map((csArr) => [...csArr]));
                       if (!next[currentModuleIndex]) return prev;
                       if (!next[currentModuleIndex][currentCaseStudyIndex]) return prev;
                       next[currentModuleIndex][currentCaseStudyIndex][currentCaseStudyQuestionIndex] = i;
                       return next;
-                    })
-                  }
+                    });
+                  }}
                 >
                   <span className="quiz-option__dot" />
                   <span className="quiz-option__label">{option}</span>
                 </button>
               ))}
             </div>
+
+            {selected !== null && (
+              <div
+                className="quiz-feedback"
+                style={{
+                  marginTop: "var(--space-4)",
+                  padding: "var(--space-4)",
+                  borderRadius: "var(--radius-lg)",
+                  background:
+                    selected === question!.correctIndex
+                      ? "var(--color-teal-pale)"
+                      : "var(--color-error-bg)",
+                  borderLeft: `4px solid ${selected === question!.correctIndex ? "var(--color-teal)" : "var(--color-error)"}`,
+                }}
+              >
+                <p
+                  style={{
+                    fontFamily: "var(--font-ui)",
+                    fontSize: "var(--text-base)",
+                    fontWeight: 700,
+                    color:
+                      selected === question!.correctIndex
+                        ? "var(--color-teal)"
+                        : "var(--color-error)",
+                    marginBottom: "var(--space-2)",
+                  }}
+                >
+                  {selected === question!.correctIndex ? "✓ Correct" : "✗ Incorrect"}
+                </p>
+                {selected !== question!.correctIndex && (
+                  <p
+                    style={{
+                      fontFamily: "var(--font-ui)",
+                      fontSize: "var(--text-sm)",
+                      lineHeight: "var(--leading-normal)",
+                      color: "var(--color-text-primary)",
+                      marginBottom: question!.explanation ? "var(--space-3)" : 0,
+                    }}
+                  >
+                    <span style={{ fontWeight: 600 }}>Correct answer:</span>{" "}
+                    {question!.options[question!.correctIndex]}
+                  </p>
+                )}
+                {question!.explanation && (
+                  <p
+                    style={{
+                      fontFamily: "var(--font-body)",
+                      fontSize: "var(--text-sm)",
+                      lineHeight: "var(--leading-normal)",
+                      color: "var(--color-text-secondary)",
+                    }}
+                  >
+                    {question!.explanation}
+                  </p>
+                )}
+              </div>
+            )}
 
             <button
               className="quiz-submit"
@@ -4916,9 +5063,10 @@ function CeuPage() {
     const progressPct = Math.round(
       (currentQuestionIndex / modQuestions.length) * 100,
     );
+    const assessmentMode: AssessmentMode = "ceu-section";
 
     return (
-      <div className="exam-shell">
+      <div className="exam-shell" data-assessment-mode={assessmentMode}>
         <Link to="/dashboard" className="page-back-link">
           ← Back to Dashboard
         </Link>
@@ -4942,20 +5090,88 @@ function CeuPage() {
           {question.options.map((option, i) => (
             <button
               key={i}
-              className={`quiz-option${selected === i ? " quiz-option--selected" : ""}`}
-              onClick={() =>
+              className={`quiz-option${
+                selected !== null
+                  ? i === question.correctIndex
+                    ? " quiz-option--correct"
+                    : i === selected
+                      ? " quiz-option--incorrect"
+                      : ""
+                  : selected === i
+                    ? " quiz-option--selected"
+                    : ""
+              }`}
+              onClick={() => {
+                if (selected !== null) return; // locked after first pick
                 setModuleAnswers((prev) => {
                   const next = prev.map((arr) => [...arr]);
                   next[currentModuleIndex][currentQuestionIndex] = i;
                   return next;
-                })
-              }
+                });
+              }}
             >
               <span className="quiz-option__dot" />
               <span className="quiz-option__label">{option}</span>
             </button>
           ))}
         </div>
+
+        {selected !== null && (
+          <div
+            className="quiz-feedback"
+            style={{
+              marginTop: "var(--space-4)",
+              padding: "var(--space-4)",
+              borderRadius: "var(--radius-lg)",
+              background:
+                selected === question.correctIndex
+                  ? "var(--color-teal-pale)"
+                  : "var(--color-error-bg)",
+              borderLeft: `4px solid ${selected === question.correctIndex ? "var(--color-teal)" : "var(--color-error)"}`,
+            }}
+          >
+            <p
+              style={{
+                fontFamily: "var(--font-ui)",
+                fontSize: "var(--text-base)",
+                fontWeight: 700,
+                color:
+                  selected === question.correctIndex
+                    ? "var(--color-teal)"
+                    : "var(--color-error)",
+                marginBottom: "var(--space-2)",
+              }}
+            >
+              {selected === question.correctIndex ? "✓ Correct" : "✗ Incorrect"}
+            </p>
+            {selected !== question.correctIndex && (
+              <p
+                style={{
+                  fontFamily: "var(--font-ui)",
+                  fontSize: "var(--text-sm)",
+                  lineHeight: "var(--leading-normal)",
+                  color: "var(--color-text-primary)",
+                  marginBottom: question.explanation ? "var(--space-3)" : 0,
+                }}
+              >
+                <span style={{ fontWeight: 600 }}>Correct answer:</span>{" "}
+                {question.options[question.correctIndex]}
+              </p>
+            )}
+            {question.explanation && (
+              <p
+                style={{
+                  fontFamily: "var(--font-body)",
+                  fontSize: "var(--text-sm)",
+                  lineHeight: "var(--leading-normal)",
+                  color: "var(--color-text-secondary)",
+                }}
+              >
+                {question.explanation}
+              </p>
+            )}
+          </div>
+        )}
 
         <button
           className="quiz-submit"
@@ -5078,9 +5294,10 @@ function CeuPage() {
     const progressPct = Math.round(
       (currentQuestionIndex / finalExamQuestions.length) * 100,
     );
+    const assessmentMode: AssessmentMode = "ceu-final";
 
     return (
-      <div className="exam-shell">
+      <div className="exam-shell" data-assessment-mode={assessmentMode}>
         <Link to="/dashboard" className="page-back-link">
           ← Back to Dashboard
         </Link>
