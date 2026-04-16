@@ -1236,18 +1236,45 @@ app.post("/api/admin/generate-certification-eeoc-skeleton", async (_req, res) =>
   }
 });
 
+// ── Admin: Background job store ──────────────────────────────────────────────
+// In-memory map of jobId → { status, payload?, error?, createdAt }
+// Jobs are cleaned up after 30 minutes to avoid unbounded memory growth.
+const adminJobs = new Map();
+const JOB_TTL_MS = 30 * 60 * 1000;
+
 // ── Admin: Generate AI content for full EEOC certification ───────────────────
-// Temporary route — builds the deterministic skeleton, then generates AI prose
-// for every lesson in parallel (25 lessons, 4 sections).
-// Quizzes, examples, and finalExam.questions are left empty (prose phase only).
-// Identical payload shape to /generate-certification-eeoc-skeleton.
-app.post("/api/admin/generate-certification-eeoc-content", async (_req, res) => {
-  try {
-    const payload = await generateCertificationContent();
-    res.json(payload);
-  } catch (err) {
-    res.status(502).json({ error: err.message });
+// Fires the generation in the background and immediately returns 202 with a
+// jobId. Poll GET /api/admin/jobs/:jobId to check progress.
+app.post("/api/admin/generate-certification-eeoc-content", (_req, res) => {
+  const jobId = `cert-content-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  adminJobs.set(jobId, { status: "running", createdAt: Date.now() });
+
+  // Fire-and-forget — do NOT await
+  generateCertificationContent()
+    .then((payload) => {
+      adminJobs.set(jobId, { status: "done", payload, createdAt: Date.now() });
+    })
+    .catch((err) => {
+      adminJobs.set(jobId, { status: "error", error: err.message, createdAt: Date.now() });
+    });
+
+  res.status(202).json({ jobId });
+});
+
+// ── Admin: Poll background job status ────────────────────────────────────────
+app.get("/api/admin/jobs/:jobId", (req, res) => {
+  const job = adminJobs.get(req.params.jobId);
+  if (!job) return res.status(404).json({ error: "Job not found or expired." });
+
+  // Clean up completed/errored jobs that are older than TTL
+  if (job.status !== "running" && Date.now() - job.createdAt > JOB_TTL_MS) {
+    adminJobs.delete(req.params.jobId);
+    return res.status(404).json({ error: "Job not found or expired." });
   }
+
+  if (job.status === "running") return res.json({ status: "running" });
+  if (job.status === "done") return res.json({ status: "done", payload: job.payload });
+  return res.status(502).json({ status: "error", error: job.error });
 });
 
 // ── Admin: Generate AI content for a single lesson ───────────────────────────
