@@ -117,9 +117,9 @@
   font-family: var(--font-ui);
   font-size: 0.7rem;
   font-weight: 600;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--color-text-muted);
+  color: #0d6e59;
   margin-bottom: 12px;
 }
 
@@ -1831,4 +1831,157 @@
     max-width: 100% !important;
   }
   body { background: white !important; }
+}
+
+
+/* ── CatalogPage: value proposition block ──────────────────────────────────── */
+
+.catalog-value-prop {
+  padding: 24px 24px 20px;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 24px;
+  margin-left: -24px;
+  margin-right: -24px;
+  background: var(--bg-warm, #f8f7f4);
+}
+
+.catalog-value-prop__headline {
+  font-family: var(--font-ui);
+  font-size: 1.0625rem;
+  font-weight: 600;
+  color: var(--navy, #1a2a4a);
+  margin: 0 0 6px;
+  line-height: 1.35;
+}
+
+.catalog-value-prop__authority {
+  font-family: var(--font-ui);
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  margin: 0;
+  line-height: 1.6;
+}
+
+
+/* ── CatalogPage: returning-user block ─────────────────────────────────────── */
+
+.catalog-returning-user {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg-warm);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 20px;
+  margin-bottom: 20px;
+}
+
+.catalog-returning-user__label {
+  font-family: var(--font-ui);
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.catalog-returning-user__btn {
+  font-size: 0.8rem !important;
+  padding: 8px 18px !important;
+}
+
+
+/* ── CatalogPage: card authority line ──────────────────────────────────────── */
+
+.catalog-card__authority {
+  font-family: var(--font-ui);
+  font-size: 0.75rem;
+  color: #0d6e59;
+  font-style: italic;
+  margin: 0 0 16px;
+}
+
+
+/* ── EeoDetailPage: hero authority line ────────────────────────────────────── */
+
+.eeo-hero__authority {
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.55);
+  margin: 0 0 32px;
+  font-style: italic;
+}
+
+
+/* ── EeoDetailPage: why-this-matters authority bar ─────────────────────────── */
+
+.eeo-authority-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 36px;
+  padding: 14px 20px;
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-left: 3px solid #0d6e59;
+  border-radius: 6px;
+  font-family: var(--font-ui);
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+
+/* ── CatalogPage: utility bar (dashboard shortcut above header) ─────────────── */
+
+.catalog-utility-bar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  min-height: 0;
+  padding: 0;
+  margin-bottom: 0;
+}
+
+.catalog-utility-bar:has(a) {
+  background: #0f1e36;
+  padding: 6px 20px;
+  border-radius: 8px 8px 0 0;
+  margin-bottom: 0;
+}
+
+.catalog-utility-bar__link {
+  font-family: var(--font-ui);
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.65);
+  text-decoration: none;
+  letter-spacing: 0.01em;
+}
+
+.catalog-utility-bar__link:hover {
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.catalog-utility-bar:has(a) + .catalog-header {
+  border-radius: 0 0 10px 10px;
+}
+
+
+/* ── CatalogPage + EeoDetailPage: teal CTA button overrides ─────────────────── */
+
+.catalog-card--active .btn-primary,
+.catalog-card--active .catalog-card__cta,
+.eeo-hero .btn-primary,
+.eeo-hero .btn-teal,
+.eeo-final-cta .btn-primary {
+  background: #0d6e59;
+  border-color: #0d6e59;
+  color: #ffffff;
+}
+
+.catalog-card--active .btn-primary:hover,
+.catalog-card--active .catalog-card__cta:hover,
+.eeo-hero .btn-primary:hover,
+.eeo-final-cta .btn-primary:hover {
+  background: #0a5a47;
+  border-color: #0a5a47;
 }
