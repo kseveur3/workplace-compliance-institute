@@ -1440,6 +1440,12 @@
   background-color: var(--color-error);
 }
 
+/* ── Feedback block (correct / incorrect + explanation) ─────────────────── */
+
+.quiz-feedback {
+  margin-bottom: var(--space-6);
+}
+
 /* ── Submit / Next button ────────────────────────────────────────────────── */
 
 .quiz-submit {
