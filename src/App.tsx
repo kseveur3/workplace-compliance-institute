@@ -1823,6 +1823,17 @@ function CatalogPage() {
       `}</style>
 
       <div className="home-shell catalog-shell">
+        {/* ── Utility bar — dashboard shortcut for returning users ── */}
+        <div className="catalog-utility-bar">
+          <SignedIn>
+            {hasOwnedExams && (
+              <Link to="/dashboard" className="catalog-utility-bar__link">
+                My Dashboard →
+              </Link>
+            )}
+          </SignedIn>
+        </div>
+
         {/* ── Institutional header ── */}
         <header className="catalog-header">
           <img
@@ -1838,11 +1849,6 @@ function CatalogPage() {
               Professional Certification &amp; Training
             </p>
           </div>
-          <SignedIn>
-            <nav className="catalog-header__nav">
-              <Link to="/dashboard">My Dashboard</Link>
-            </nav>
-          </SignedIn>
         </header>
 
         {/* ── Trust strip ── */}
@@ -1924,16 +1930,17 @@ function CatalogPage() {
           </span>
         </div>
 
-        <main>
-          {/* ── Dashboard shortcut — logic unchanged ── */}
-          <SignedIn>
-            {hasOwnedExams && (
-              <p className="catalog-dashboard-link">
-                <Link to="/dashboard">Go to your Dashboard →</Link>
-              </p>
-            )}
-          </SignedIn>
+        <div className="catalog-value-prop">
+          <p className="catalog-value-prop__headline">
+            Professional HR certification built for the work you're actually doing
+          </p>
+          <p className="catalog-value-prop__authority">
+            Built by practitioners with 60+ years of combined HR investigation
+            and workplace compliance experience
+          </p>
+        </div>
 
+        <main>
           {/* ── Section label ── */}
           <p className="catalog-section-label">Certification Tracks</p>
 
@@ -1999,6 +2006,22 @@ function CatalogPage() {
               <p className="catalog-card__desc">
                 Structured investigation frameworks for harassment and hostile
                 work environment claims under Title VII and related statutes.
+              </p>
+              <span className="catalog-card__soon-label">Coming Soon</span>
+            </div>
+
+            {/* Coming soon — FMLA */}
+            <div className="catalog-card catalog-card--soon">
+              <span className="catalog-card__badge catalog-card__badge--soon">
+                Coming Soon
+              </span>
+              <h2 className="catalog-card__title">
+                FMLA &amp; Leave Management
+              </h2>
+              <p className="catalog-card__desc">
+                Practical compliance training for managing family and medical
+                leave, intermittent leave, and the documentation required to
+                protect your organization from leave-related claims.
               </p>
               <span className="catalog-card__soon-label">Coming Soon</span>
             </div>
@@ -2124,6 +2147,10 @@ function EeoDetailPage() {
               Structured as a 40-hour self-paced program &nbsp;·&nbsp; Built on
               EEOC guidance
             </p>
+            <p className="eeo-hero__authority">
+              Developed by active EEO investigators with 60+ years of combined
+              federal workplace investigation experience
+            </p>
 
             {/* ── Auth / purchase block — original logic, original order, restyled container ── */}
             <div className="eeo-hero__cta-block">
@@ -2234,6 +2261,17 @@ function EeoDetailPage() {
                   this right — procedurally and documentarily — matters.
                 </p>
               </div>
+            </div>
+            <div className="eeo-authority-bar">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"
+                   aria-hidden="true" style={{ flexShrink: 0 }}>
+                <path d="M8 1.5L2 4v4c0 3.2 2.5 6.1 6 6.8 3.5-.7 6-3.6 6-6.8V4L8 1.5z"
+                      stroke="#0d6e59" strokeWidth="1.2" strokeLinejoin="round"/>
+                <path d="M5.5 8.3l1.8 1.8 3.2-3.2" stroke="#0d6e59"
+                      strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              Developed by active EEO investigators with 60+ years of combined
+              federal workplace investigation experience
             </div>
           </div>
         </section>
