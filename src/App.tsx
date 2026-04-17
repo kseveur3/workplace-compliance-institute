@@ -3472,6 +3472,13 @@ function LessonPage() {
   const [autoCompleted, setAutoCompleted] = useState(false);
   const [hasUserScrolled, setHasUserScrolled] = useState(false);
 
+  // ── Text-to-speech (lesson narration only) ───────────────────────────────
+  const ttsSupported = typeof window !== "undefined" && "speechSynthesis" in window;
+  type TtsStatus = "ready" | "playing" | "paused" | "unsupported";
+  const [ttsStatus, setTtsStatus] = useState<TtsStatus>(ttsSupported ? "ready" : "unsupported");
+  const [ttsRate, setTtsRate] = useState(1);
+  const uttRef = useRef<SpeechSynthesisUtterance | null>(null);
+
   useEffect(() => {
     setAutoCompleted(false);
     setHasUserScrolled(false);
@@ -3502,6 +3509,48 @@ function LessonPage() {
     return () => observer.disconnect();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lesson.id, hasUserScrolled]);
+
+  // Stop speech when navigating to a different lesson or leaving the page entirely
+  useEffect(() => {
+    return () => {
+      if (ttsSupported) window.speechSynthesis.cancel();
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lesson.id]);
+
+  // Reset status to ready when lesson changes (new utterance will be needed)
+  useEffect(() => {
+    setTtsStatus(ttsSupported ? "ready" : "unsupported");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lesson.id]);
+
+  function ttsPlay(rate = ttsRate) {
+    if (!ttsSupported) return;
+    window.speechSynthesis.cancel();
+    const text = [lessonDisplayTitle, ...lesson.content].join(". ");
+    const utt = new SpeechSynthesisUtterance(text);
+    utt.rate = rate;
+    utt.onend = () => setTtsStatus("ready");
+    utt.onerror = (e: SpeechSynthesisErrorEvent) => {
+      if (e.error === "interrupted") return;
+      setTtsStatus("ready");
+    };
+    uttRef.current = utt;
+    window.speechSynthesis.speak(utt);
+    setTtsStatus("playing");
+  }
+
+  function ttsPause() {
+    if (!ttsSupported) return;
+    window.speechSynthesis.pause();
+    setTtsStatus("paused");
+  }
+
+  function ttsResume() {
+    if (!ttsSupported) return;
+    window.speechSynthesis.resume();
+    setTtsStatus("playing");
+  }
 
   const overallProgressPct = Math.round(
     ((lessonIndex + 1) / ALL_LESSONS.length) * 100,
@@ -3537,7 +3586,86 @@ function LessonPage() {
         <div ref={bottomSentinelRef} />
       </div>
 
-      <div className="lesson-audio">{`Audio narration for ${lessonDisplayTitle} coming soon.`}</div>
+      <div className="lesson-audio">
+        {ttsStatus === "unsupported" ? (
+          <span className="lesson-audio__status">Not supported in this browser</span>
+        ) : (
+          <>
+            <div className="lesson-audio__controls">
+              {ttsStatus === "ready" && (
+                <button
+                  className="lesson-audio__btn"
+                  onClick={() => ttsPlay()}
+                  aria-label="Play narration"
+                >
+                  ▶ Play
+                </button>
+              )}
+              {ttsStatus === "playing" && (
+                <>
+                  <button
+                    className="lesson-audio__btn"
+                    onClick={ttsPause}
+                    aria-label="Pause narration"
+                  >
+                    ⏸ Pause
+                  </button>
+                  <button
+                    className="lesson-audio__btn lesson-audio__btn--ghost"
+                    onClick={() => ttsPlay()}
+                    aria-label="Restart narration"
+                  >
+                    ↺ Restart
+                  </button>
+                </>
+              )}
+              {ttsStatus === "paused" && (
+                <>
+                  <button
+                    className="lesson-audio__btn"
+                    onClick={ttsResume}
+                    aria-label="Resume narration"
+                  >
+                    ▶ Resume
+                  </button>
+                  <button
+                    className="lesson-audio__btn lesson-audio__btn--ghost"
+                    onClick={() => ttsPlay()}
+                    aria-label="Restart narration"
+                  >
+                    ↺ Restart
+                  </button>
+                </>
+              )}
+              <select
+                className="lesson-audio__speed"
+                value={ttsRate}
+                aria-label="Playback speed"
+                onChange={(e) => {
+                  setTtsRate(parseFloat(e.target.value));
+                }}
+              >
+                <option value={0.75}>0.75×</option>
+                <option value={1}>1×</option>
+                <option value={1.25}>1.25×</option>
+                <option value={1.5}>1.5×</option>
+              </select>
+            </div>
+            {ttsStatus === "playing" && (
+              <span className="lesson-audio__speed-hint">
+                New speed applies on restart
+              </span>
+            )}
+            <span className="lesson-audio__status">
+              {ttsStatus === "playing"
+                ? "Playing"
+                : ttsStatus === "paused"
+                  ? "Paused"
+                  : "Ready"}
+            </span>
+          </>
+        )}
+      </div>
 
       <div className="lesson-complete-row">
         <button onClick={() => toggle(lesson.id)}>
